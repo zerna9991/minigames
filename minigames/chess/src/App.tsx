@@ -1,6 +1,8 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import ChessBoard from './components/ChessBoard';
-import { useSyncedGame, type HistoryEntry } from './net/useSyncedGame';
+import { useEffect, useState, type ReactNode } from "react";
+import ChessBoard from "./components/ChessBoard";
+import ProfileSidebar from "./components/ProfileSidebar";
+import { resolveStudent } from "./data/students";
+import { useSyncedGame, type HistoryEntry } from "./net/useSyncedGame";
 import {
   applyMove,
   createInitialState,
@@ -8,8 +10,8 @@ import {
   type GameState,
   type Move,
   type Piece,
-} from './chess/engine';
-import './App.css';
+} from "./chess/engine";
+import "./App.css";
 
 function getParams(): URLSearchParams {
   return new URLSearchParams(window.location.search);
@@ -28,22 +30,21 @@ function inviteUrl(gameId: string): string {
 function tabName(fallback: string): string {
   if (fallback) return fallback;
   try {
-    const existing = sessionStorage.getItem('act-chess-you');
+    const existing = sessionStorage.getItem("act-chess-you");
     if (existing) return existing;
     const fresh = `Player-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-    sessionStorage.setItem('act-chess-you', fresh);
+    sessionStorage.setItem("act-chess-you", fresh);
     return fresh;
   } catch {
-    return 'Player';
+    return "Player";
   }
 }
 
 /* ---------------- Shared room chrome ---------------- */
 
 function RoomShell(props: {
-  gameId: string;
-  subtitle: string;
   lobbyLine: ReactNode;
+  sidebar: ReactNode;
   board: ReactNode;
   modal: ReactNode;
 }) {
@@ -53,13 +54,12 @@ function RoomShell(props: {
         <span className="brand">
           <span className="brand-mark">♞</span> ACT Chess
         </span>
-        <span className="top-meta">
-          <span className="badge">Room {props.gameId}</span>
-          <span className="badge soft">{props.subtitle}</span>
-        </span>
       </header>
       <div className="lobby-strip">{props.lobbyLine}</div>
-      <main className="room-main">{props.board}</main>
+      <div className="room-body">
+        {props.sidebar}
+        <main className="room-main">{props.board}</main>
+      </div>
       {props.modal}
     </div>
   );
@@ -71,18 +71,38 @@ function OnlineRoom({ gameId, you }: { gameId: string; you: string }) {
   const room = useSyncedGame(gameId, you);
   const { opponent, bothJoined, bothReady, myReady, opponentReady } = room;
 
-  const myColorLabel = room.myColor === 'w' ? 'White' : room.myColor === 'b' ? 'Black' : 'Spectating';
-  const resolvedWhite = room.myColor === 'w' ? you : (opponent?.color === 'w' ? opponent.name : 'White');
-  const resolvedBlack = room.myColor === 'b' ? you : (opponent?.color === 'b' ? opponent.name : 'Black');
+  const myColorLabel =
+    room.myColor === "w"
+      ? "White"
+      : room.myColor === "b"
+        ? "Black"
+        : "Spectating";
+  const resolvedWhite =
+    room.myColor === "w"
+      ? you
+      : opponent?.color === "w"
+        ? opponent.name
+        : "White";
+  const resolvedBlack =
+    room.myColor === "b"
+      ? you
+      : opponent?.color === "b"
+        ? opponent.name
+        : "Black";
+  const oppColor = opponent?.color ?? (room.myColor === "w" ? "b" : "w");
+  const myStudent = resolveStudent(you);
+  const oppStudent = opponent ? resolveStudent(opponent.name) : null;
 
   function copyInvite() {
-    void navigator.clipboard?.writeText(inviteUrl(gameId)).catch(() => undefined);
+    void navigator.clipboard
+      ?.writeText(inviteUrl(gameId))
+      .catch(() => undefined);
   }
 
   const lobbyLine = !bothJoined ? (
     <span>
-      <strong>{you}</strong> is in the lobby · waiting for opponent… share the room code{' '}
-      <strong>{gameId}</strong> or{' '}
+      <strong>{you}</strong> is in the lobby · waiting for opponent… share the
+      room code <strong>{gameId}</strong> or{" "}
       <button type="button" className="link-btn" onClick={copyInvite}>
         copy the invite link
       </button>
@@ -90,19 +110,50 @@ function OnlineRoom({ gameId, you }: { gameId: string; you: string }) {
     </span>
   ) : bothReady ? (
     <span>
-      <strong>{you}</strong> vs <strong>{opponent?.name}</strong> · game started.
+      <strong>{you}</strong> vs <strong>{opponent?.name}</strong> · game
+      started.
     </span>
   ) : (
     <span>
-      Both players are in the lobby · waiting for OK ({myReady ? 1 : 0} + {opponentReady ? 1 : 0} / 2).
+      Both players are in the lobby · waiting for OK ({myReady ? 1 : 0} +{" "}
+      {opponentReady ? 1 : 0} / 2).
     </span>
   );
 
   return (
     <RoomShell
-      gameId={gameId}
-      subtitle={`You: ${you} (${myColorLabel})`}
       lobbyLine={lobbyLine}
+      sidebar={
+        <ProfileSidebar
+          top={{
+            key: "opponent",
+            tag: "Opponent",
+            firstName: oppStudent?.firstName ?? "Waiting",
+            lastName: oppStudent?.lastName ?? "for opponent…",
+            faculty: oppStudent?.faculty ?? "—",
+            group: oppStudent?.group ?? "—",
+            photo: oppStudent?.photo ?? null,
+            colorLabel: oppColor === "w" ? "White" : "Black",
+            ready: bothJoined ? opponentReady : undefined,
+            isTurn: bothReady && room.game.turn === oppColor,
+          }}
+          bottom={{
+            key: "you",
+            tag: "You",
+            firstName: myStudent.firstName,
+            lastName: myStudent.lastName,
+            faculty: myStudent.faculty,
+            group: myStudent.group,
+            photo: myStudent.photo ?? null,
+            colorLabel: myColorLabel,
+            ready: bothJoined ? myReady : undefined,
+            isTurn:
+              bothReady &&
+              room.myColor !== null &&
+              room.game.turn === room.myColor,
+          }}
+        />
+      }
       board={
         <ChessBoard
           whiteName={resolvedWhite}
@@ -111,23 +162,31 @@ function OnlineRoom({ gameId, you }: { gameId: string; you: string }) {
           history={room.history}
           lastMove={room.lastMove}
           locked={!bothReady}
-          lockLabel={!bothJoined ? 'Waiting for opponent…' : 'Press OK to start'}
+          lockLabel={
+            !bothJoined ? "Waiting for opponent…" : "Press OK to start"
+          }
           myColor={room.myColor === null ? null : room.myColor}
           onMove={room.doMove}
-          onReset={room.reset}
-          onUndo={room.undo}
         />
       }
       modal={
         bothJoined && !bothReady && opponent ? (
-          <div className="overlay" role="dialog" aria-modal="true" aria-label="Welcome">
+          <div
+            className="overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Welcome"
+          >
             <div className="modal">
               <p className="eyebrow">ACT Chess · Room {gameId}</p>
-              <h3>Welcome to ACT Chess, you are now playing with {opponent.name}</h3>
+              <h3>
+                Welcome to ACT Chess, you are now playing with {opponent.name}
+              </h3>
               {!myReady ? (
                 <>
                   <p className="muted">
-                    Press OK when you are ready. The board unlocks once both players press OK.
+                    Press OK when you are ready. The board unlocks once both
+                    players press OK.
                   </p>
                   <button
                     type="button"
@@ -149,8 +208,10 @@ function OnlineRoom({ gameId, you }: { gameId: string; you: string }) {
                 </>
               )}
               <p className="hint">
-                {opponentReady ? `${opponent.name} is ready.` : `${opponent.name} has not pressed OK yet.`} You play{' '}
-                {myColorLabel}.
+                {opponentReady
+                  ? `${opponent.name} is ready.`
+                  : `${opponent.name} has not pressed OK yet.`}{" "}
+                You play {myColorLabel}.
               </p>
             </div>
           </div>
@@ -177,47 +238,61 @@ function LocalRoom({
   const [whiteOk, setWhiteOk] = useState(false);
   const [blackOk, setBlackOk] = useState(false);
   const bothReady = whiteOk && blackOk;
+  const whiteStudent = resolveStudent(whiteName);
+  const blackStudent = resolveStudent(blackName);
 
   function doMove(m: Move) {
     const san = moveToSan(game, m);
     const captured: Piece | null = m.isEnPassant
-      ? { type: 'p', color: game.turn === 'w' ? 'b' : 'w' }
+      ? { type: "p", color: game.turn === "w" ? "b" : "w" }
       : (game.board[m.toR][m.toC] ?? null);
     setGame(applyMove(game, m));
     setHistory((h) => [...h, { san, move: m, captured }]);
     setLastMove(m);
   }
 
-  function reset() {
-    setGame(createInitialState());
-    setHistory([]);
-    setLastMove(null);
-  }
-
-  function undo() {
-    if (history.length === 0) return;
-    let g = createInitialState();
-    const kept = history.slice(0, -1);
-    for (const h of kept) g = applyMove(g, h.move);
-    setGame(g);
-    setHistory(kept);
-    setLastMove(kept.length > 0 ? kept[kept.length - 1].move : null);
-  }
-
   return (
     <RoomShell
-      gameId={gameId}
-      subtitle={`${whiteName} (White) vs ${blackName} (Black)`}
       lobbyLine={
         bothReady ? (
           <span>
-            <strong>{whiteName}</strong> vs <strong>{blackName}</strong> · game started.
+            <strong>{whiteName}</strong> vs <strong>{blackName}</strong> · game
+            started.
           </span>
         ) : (
           <span>
-            Both players are in the lobby · waiting for OK ({(whiteOk ? 1 : 0) + (blackOk ? 1 : 0)} / 2).
+            Both players are in the lobby · waiting for OK (
+            {(whiteOk ? 1 : 0) + (blackOk ? 1 : 0)} / 2).
           </span>
         )
+      }
+      sidebar={
+        <ProfileSidebar
+          top={{
+            key: "black",
+            tag: "Opponent · Black",
+            firstName: blackStudent.firstName,
+            lastName: blackStudent.lastName,
+            faculty: blackStudent.faculty,
+            group: blackStudent.group,
+            photo: blackStudent.photo ?? null,
+            colorLabel: "Black",
+            ready: blackOk,
+            isTurn: bothReady && game.turn === "b",
+          }}
+          bottom={{
+            key: "white",
+            tag: "You · White",
+            firstName: whiteStudent.firstName,
+            lastName: whiteStudent.lastName,
+            faculty: whiteStudent.faculty,
+            group: whiteStudent.group,
+            photo: whiteStudent.photo ?? null,
+            colorLabel: "White",
+            ready: whiteOk,
+            isTurn: bothReady && game.turn === "w",
+          }}
+        />
       }
       board={
         <ChessBoard
@@ -230,25 +305,30 @@ function LocalRoom({
           lockLabel="Press OK to start"
           myColor="both"
           onMove={doMove}
-          onReset={reset}
-          onUndo={undo}
         />
       }
       modal={
         !bothReady ? (
-          <div className="overlay" role="dialog" aria-modal="true" aria-label="Welcome">
+          <div
+            className="overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Welcome"
+          >
             <div className="modal">
               <p className="eyebrow">ACT Chess · Room {gameId}</p>
               <h3>
-                Welcome to ACT Chess, {whiteName} you are now playing with {blackName}
+                Welcome to ACT Chess, {whiteName} you are now playing with{" "}
+                {blackName}
               </h3>
               <p className="muted">
-                Each player presses their own OK. The board unlocks after both press OK.
+                Each player presses their own OK. The board unlocks after both
+                press OK.
               </p>
               <div className="btn-row">
                 <button
                   type="button"
-                  className={`btn ${whiteOk ? 'secondary' : 'primary'}`}
+                  className={`btn ${whiteOk ? "secondary" : "primary"}`}
                   onClick={() => setWhiteOk(true)}
                   disabled={whiteOk}
                 >
@@ -256,7 +336,7 @@ function LocalRoom({
                 </button>
                 <button
                   type="button"
-                  className={`btn ${blackOk ? 'secondary' : 'primary'}`}
+                  className={`btn ${blackOk ? "secondary" : "primary"}`}
                   onClick={() => setBlackOk(true)}
                   disabled={blackOk}
                 >
@@ -274,24 +354,24 @@ function LocalRoom({
 /* ---------------- App: straight into the room, no entry page ---------------- */
 
 type Route =
-  | { mode: 'online'; gameId: string; you: string }
-  | { mode: 'local'; gameId: string; whiteName: string; blackName: string };
+  | { mode: "online"; gameId: string; you: string }
+  | { mode: "local"; gameId: string; whiteName: string; blackName: string };
 
 function initialRoute(): Route {
   const q = getParams();
-  const game = (q.get('game') ?? '').trim().toUpperCase() || makeGameId();
-  if (q.get('local') === '1') {
+  const game = (q.get("game") ?? "").trim().toUpperCase() || makeGameId();
+  if (q.get("local") === "1") {
     return {
-      mode: 'local',
+      mode: "local",
       gameId: game,
-      whiteName: (q.get('white') ?? '').trim() || 'White',
-      blackName: (q.get('black') ?? '').trim() || 'Black',
+      whiteName: (q.get("white") ?? "").trim() || "White",
+      blackName: (q.get("black") ?? "").trim() || "Black",
     };
   }
   return {
-    mode: 'online',
+    mode: "online",
     gameId: game,
-    you: tabName((q.get('you') ?? '').trim()),
+    you: tabName((q.get("you") ?? "").trim()),
   };
 }
 
@@ -300,18 +380,22 @@ export default function App() {
 
   // Keep the room shareable: ensure the URL carries ?game=… (no page change).
   useEffect(() => {
-    if (!getParams().get('game')) {
+    if (!getParams().get("game")) {
       window.history.replaceState(
         null,
-        '',
+        "",
         `${window.location.pathname}?game=${route.gameId}`,
       );
     }
   }, [route.gameId]);
 
-  if (route.mode === 'local') {
+  if (route.mode === "local") {
     return (
-      <LocalRoom gameId={route.gameId} whiteName={route.whiteName} blackName={route.blackName} />
+      <LocalRoom
+        gameId={route.gameId}
+        whiteName={route.whiteName}
+        blackName={route.blackName}
+      />
     );
   }
   return <OnlineRoom gameId={route.gameId} you={route.you} />;

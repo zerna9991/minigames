@@ -29,8 +29,6 @@ type Msg =
   | { kind: 'bye'; id: string }
   | { kind: 'ready'; id: string; name: string; ready: boolean }
   | { kind: 'move'; id: string; move: Move }
-  | { kind: 'reset'; id: string }
-  | { kind: 'undo'; id: string }
   | { kind: 'sync-request'; id: string }
   | {
       kind: 'sync-state';
@@ -116,7 +114,6 @@ function releaseSeat(gameId: string, clientId: string): void {
 
 export interface SyncedGame {
   myColor: SeatColor | null;
-  peers: PeerInfo[];
   opponent: PeerInfo | null;
   bothJoined: boolean;
   myReady: boolean;
@@ -127,8 +124,6 @@ export interface SyncedGame {
   lastMove: Move | null;
   pressReady: () => void;
   doMove: (m: Move) => void;
-  reset: () => void;
-  undo: () => void;
 }
 
 /**
@@ -270,23 +265,6 @@ export function useSyncedGame(gameId: string, myName: string): SyncedGame {
           applyRemoteMove(msg.move);
           break;
         }
-        case 'reset': {
-          setGame(createInitialState());
-          setHistory([]);
-          setLastMove(null);
-          break;
-        }
-        case 'undo': {
-          const s = stateRef.current;
-          if (s.history.length === 0) break;
-          let g = createInitialState();
-          const kept = s.history.slice(0, -1);
-          for (const h of kept) g = applyMove(g, h.move);
-          setGame(g);
-          setHistory(kept);
-          setLastMove(kept.length > 0 ? kept[kept.length - 1].move : null);
-          break;
-        }
         case 'sync-request': {
           const s = stateRef.current;
           if (s.history.length > 0) {
@@ -377,25 +355,6 @@ export function useSyncedGame(gameId: string, myName: string): SyncedGame {
     [clientId, send],
   );
 
-  const reset = useCallback(() => {
-    setGame(createInitialState());
-    setHistory([]);
-    setLastMove(null);
-    send({ kind: 'reset', id: clientId });
-  }, [clientId, send]);
-
-  const undo = useCallback(() => {
-    const s = stateRef.current;
-    if (s.history.length === 0) return;
-    let g = createInitialState();
-    const kept = s.history.slice(0, -1);
-    for (const h of kept) g = applyMove(g, h.move);
-    setGame(g);
-    setHistory(kept);
-    setLastMove(kept.length > 0 ? kept[kept.length - 1].move : null);
-    send({ kind: 'undo', id: clientId });
-  }, [clientId, send]);
-
   const peerList = useMemo(() => Object.values(peers), [peers]);
   const opponent = useMemo<PeerInfo | null>(() => {
     if (peerList.length === 0) return null;
@@ -412,7 +371,6 @@ export function useSyncedGame(gameId: string, myName: string): SyncedGame {
 
   return {
     myColor,
-    peers: peerList,
     opponent,
     bothJoined,
     myReady,
@@ -423,7 +381,5 @@ export function useSyncedGame(gameId: string, myName: string): SyncedGame {
     lastMove,
     pressReady,
     doMove,
-    reset,
-    undo,
   };
 }
