@@ -18,8 +18,6 @@ const GLYPH: Record<PieceColor, Record<PieceType, string>> = {
 export type BoardControl = PieceColor | "both" | null;
 
 interface Props {
-  whiteName: string;
-  blackName: string;
   game: GameState;
   history: HistoryEntry[];
   lastMove: Move | null;
@@ -32,8 +30,6 @@ interface Props {
 }
 
 export default function ChessBoard({
-  whiteName,
-  blackName,
   game,
   history,
   lastMove,
@@ -46,13 +42,12 @@ export default function ChessBoard({
     null,
   );
   const [targets, setTargets] = useState<Move[]>([]);
-  const [flipped, setFlipped] = useState(false);
   const [pendingPromotion, setPendingPromotion] = useState<Move[] | null>(null);
 
   const result = useMemo(() => getGameResult(game), [game]);
 
-  const rows = flipped ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
-  const cols = flipped ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
+  const rows = [0, 1, 2, 3, 4, 5, 6, 7];
+  const cols = [0, 1, 2, 3, 4, 5, 6, 7];
 
   const kingInCheck: { r: number; c: number } | null = (() => {
     if (!result.inCheck) return null;
@@ -117,23 +112,7 @@ export default function ChessBoard({
     clearSelection();
   }
 
-  function copyInvite() {
-    // Share the room, never a per-tab player name.
-    const q = new URLSearchParams(window.location.search);
-    q.delete("you");
-    const query = q.toString();
-    const url = `${window.location.origin}${window.location.pathname}${query ? `?${query}` : ""}`;
-    void navigator.clipboard?.writeText(url).catch(() => undefined);
-  }
-
-  const turnName = game.turn === "w" ? whiteName : blackName;
   const targetKeys = new Set(targets.map((t) => `${t.toR}-${t.toC}`));
-  const waitingForMe =
-    !locked &&
-    !result.over &&
-    myColor !== "both" &&
-    myColor !== null &&
-    game.turn !== myColor;
 
   return (
     <div className="game-wrap">
@@ -168,10 +147,10 @@ export default function ChessBoard({
                     onClick={() => onSquare(r, c)}
                     disabled={locked}
                   >
-                    {c === (flipped ? 7 : 0) && (
+                    {c === 0 && (
                       <span className="coord rank">{8 - r}</span>
                     )}
-                    {r === (flipped ? 0 : 7) && (
+                    {r === 7 && (
                       <span className="coord file">{"abcdefgh"[c]}</span>
                     )}
                     {piece && (
@@ -200,70 +179,6 @@ export default function ChessBoard({
       </div>
 
       <div className="right-col">
-        <aside className="side-card">
-          <div className="turn-row">
-            <span className={`turn-badge ${game.turn === "w" ? "wt" : "bt"}`}>
-              {locked
-                ? "Lobby"
-                : result.over
-                  ? "Game over"
-                  : `${turnName} to move`}
-            </span>
-            {result.inCheck && !result.over && !locked && (
-              <span className="badge danger">Check</span>
-            )}
-          </div>
-
-          {waitingForMe ? (
-            <div className="status-box">
-              <strong>Waiting for {turnName}</strong>
-              <span>
-                Moves sync automatically — the board unlocks on your turn.
-              </span>
-            </div>
-          ) : result.over ? (
-            <div className="status-box over">
-              <strong>
-                {result.winner === null
-                  ? result.reason
-                  : `${result.winner === "w" ? whiteName : blackName} wins · ${result.reason}`}
-              </strong>
-              <span>Reload the page for a rematch.</span>
-            </div>
-          ) : (
-            <div className="status-box">
-              <strong>
-                {locked
-                  ? "Game has not started"
-                  : `${game.turn === "w" ? "White" : "Black"} · ${turnName}`}
-              </strong>
-              <span>
-                {locked
-                  ? "Both players press OK in the welcome message to start."
-                  : "Select a piece to see legal moves. Full rules apply."}
-              </span>
-            </div>
-          )}
-
-          <div className="btn-row">
-            <button
-              type="button"
-              className="btn ghost"
-              onClick={() => setFlipped((f) => !f)}
-            >
-              Flip board
-            </button>
-          </div>
-          <div className="btn-row">
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={copyInvite}
-            >
-              Copy invite link
-            </button>
-          </div>
-        </aside>
         <div className="empty-box">
           <div className="moves-head">
             Moves · {Math.ceil(history.length / 2)}

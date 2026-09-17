@@ -21,11 +21,6 @@ function makeGameId(): string {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 
-/** Shareable room link — carries the room only, never a per-tab player name. */
-function inviteUrl(gameId: string): string {
-  return `${window.location.origin}${window.location.pathname}?game=${gameId}`;
-}
-
 /** Stable per-tab identity so two tabs never share a display name. */
 function tabName(fallback: string): string {
   if (fallback) return fallback;
@@ -43,7 +38,6 @@ function tabName(fallback: string): string {
 /* ---------------- Shared room chrome ---------------- */
 
 function RoomShell(props: {
-  lobbyLine: ReactNode;
   sidebar: ReactNode;
   board: ReactNode;
   modal: ReactNode;
@@ -55,7 +49,6 @@ function RoomShell(props: {
           <span className="brand-mark">♞</span> ACT Chess
         </span>
       </header>
-      <div className="lobby-strip">{props.lobbyLine}</div>
       <div className="room-body">
         {props.sidebar}
         <main className="room-main">{props.board}</main>
@@ -77,52 +70,12 @@ function OnlineRoom({ gameId, you }: { gameId: string; you: string }) {
       : room.myColor === "b"
         ? "Black"
         : "Spectating";
-  const resolvedWhite =
-    room.myColor === "w"
-      ? you
-      : opponent?.color === "w"
-        ? opponent.name
-        : "White";
-  const resolvedBlack =
-    room.myColor === "b"
-      ? you
-      : opponent?.color === "b"
-        ? opponent.name
-        : "Black";
   const oppColor = opponent?.color ?? (room.myColor === "w" ? "b" : "w");
   const myStudent = resolveStudent(you);
   const oppStudent = opponent ? resolveStudent(opponent.name) : null;
 
-  function copyInvite() {
-    void navigator.clipboard
-      ?.writeText(inviteUrl(gameId))
-      .catch(() => undefined);
-  }
-
-  const lobbyLine = !bothJoined ? (
-    <span>
-      <strong>{you}</strong> is in the lobby · waiting for opponent… share the
-      room code <strong>{gameId}</strong> or{" "}
-      <button type="button" className="link-btn" onClick={copyInvite}>
-        copy the invite link
-      </button>
-      .
-    </span>
-  ) : bothReady ? (
-    <span>
-      <strong>{you}</strong> vs <strong>{opponent?.name}</strong> · game
-      started.
-    </span>
-  ) : (
-    <span>
-      Both players are in the lobby · waiting for OK ({myReady ? 1 : 0} +{" "}
-      {opponentReady ? 1 : 0} / 2).
-    </span>
-  );
-
   return (
     <RoomShell
-      lobbyLine={lobbyLine}
       sidebar={
         <ProfileSidebar
           top={{
@@ -156,8 +109,6 @@ function OnlineRoom({ gameId, you }: { gameId: string; you: string }) {
       }
       board={
         <ChessBoard
-          whiteName={resolvedWhite}
-          blackName={resolvedBlack}
           game={room.game}
           history={room.history}
           lastMove={room.lastMove}
@@ -253,19 +204,6 @@ function LocalRoom({
 
   return (
     <RoomShell
-      lobbyLine={
-        bothReady ? (
-          <span>
-            <strong>{whiteName}</strong> vs <strong>{blackName}</strong> · game
-            started.
-          </span>
-        ) : (
-          <span>
-            Both players are in the lobby · waiting for OK (
-            {(whiteOk ? 1 : 0) + (blackOk ? 1 : 0)} / 2).
-          </span>
-        )
-      }
       sidebar={
         <ProfileSidebar
           top={{
@@ -296,8 +234,6 @@ function LocalRoom({
       }
       board={
         <ChessBoard
-          whiteName={whiteName}
-          blackName={blackName}
           game={game}
           history={history}
           lastMove={lastMove}
