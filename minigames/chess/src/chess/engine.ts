@@ -1,5 +1,3 @@
-// Minimal, dependency-free chess engine: full legal-move generation,
-// check / checkmate / stalemate, castling, en passant, promotion.
 export type PieceColor = 'w' | 'b';
 export type PieceType = 'k' | 'q' | 'r' | 'b' | 'n' | 'p';
 
@@ -8,7 +6,7 @@ export interface Piece {
   color: PieceColor;
 }
 
-export type Board = (Piece | null)[][]; // [rank][file], rank 0 = 8th rank
+export type Board = (Piece | null)[][];
 
 export interface CastlingRights {
   wK: boolean;
@@ -103,8 +101,8 @@ export function isSquareAttacked(
   c: number,
   by: PieceColor,
 ): boolean {
-  // Pawns
-  const pawnDir = by === 'w' ? 1 : -1; // attacker sits one step behind target
+
+  const pawnDir = by === 'w' ? 1 : -1;
   for (const dc of [-1, 1]) {
     const pr = r + pawnDir;
     const pc = c + dc;
@@ -113,7 +111,7 @@ export function isSquareAttacked(
       if (p && p.color === by && p.type === 'p') return true;
     }
   }
-  // Knights
+
   const knightDeltas = [
     [-2, -1], [-2, 1], [-1, -2], [-1, 2],
     [1, -2], [1, 2], [2, -1], [2, 1],
@@ -126,7 +124,7 @@ export function isSquareAttacked(
       if (p && p.color === by && p.type === 'n') return true;
     }
   }
-  // King
+
   for (let dr = -1; dr <= 1; dr++) {
     for (let dc = -1; dc <= 1; dc++) {
       if (dr === 0 && dc === 0) continue;
@@ -138,7 +136,7 @@ export function isSquareAttacked(
       }
     }
   }
-  // Sliders
+
   const bishopDirs = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
   const rookDirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
   for (const [dr, dc] of bishopDirs) {
@@ -204,7 +202,7 @@ function pseudoMovesForSquare(state: GameState, r: number, c: number): Move[] {
         }
       }
     }
-    // Captures
+
     for (const dc of [-1, 1]) {
       const nr = r + dir;
       const nc = c + dc;
@@ -219,7 +217,7 @@ function pseudoMovesForSquare(state: GameState, r: number, c: number): Move[] {
           push(nr, nc);
         }
       }
-      // En passant
+
       if (enPassant && enPassant.r === nr && enPassant.c === nc) {
         push(nr, nc, { isEnPassant: true });
       }
@@ -247,7 +245,7 @@ function pseudoMovesForSquare(state: GameState, r: number, c: number): Move[] {
         if (!t || (t.color !== color && t.type !== 'k')) push(nr, nc);
       }
     }
-    // Castling
+
     const homeRow = color === 'w' ? 7 : 0;
     if (r === homeRow && c === 4) {
       const enemy = opposite(color);
@@ -310,7 +308,7 @@ function applyMoveRaw(state: GameState, m: Move): GameState {
   if (!piece) return next;
   const captured = next.board[m.toR][m.toC];
 
-  // En passant capture
+
   if (m.isEnPassant) {
     const dir = piece.color === 'w' ? 1 : -1;
     next.board[m.toR + dir][m.toC] = null;
@@ -321,7 +319,7 @@ function applyMoveRaw(state: GameState, m: Move): GameState {
     : piece;
   next.board[m.fromR][m.fromC] = null;
 
-  // Castle rook hop
+
   if (m.isCastle) {
     const homeRow = piece.color === 'w' ? 7 : 0;
     if (m.isCastle === 'K') {
@@ -333,7 +331,7 @@ function applyMoveRaw(state: GameState, m: Move): GameState {
     }
   }
 
-  // Castling rights
+
   if (piece.type === 'k') {
     if (piece.color === 'w') {
       next.castling.wK = false;
@@ -352,14 +350,14 @@ function applyMoveRaw(state: GameState, m: Move): GameState {
   clearRookRight(m.fromR, m.fromC);
   clearRookRight(m.toR, m.toC);
 
-  // En passant target
+
   if (piece.type === 'p' && Math.abs(m.toR - m.fromR) === 2) {
     next.enPassant = { r: (m.fromR + m.toR) / 2, c: m.fromC };
   } else {
     next.enPassant = null;
   }
 
-  // Clocks
+
   if (piece.type === 'p' || captured || m.isEnPassant) {
     next.halfmove = 0;
   } else {
@@ -370,7 +368,7 @@ function applyMoveRaw(state: GameState, m: Move): GameState {
   return next;
 }
 
-/** Legal moves for one square (king-safety filtered). */
+
 export function legalMovesForSquare(state: GameState, r: number, c: number): Move[] {
   const piece = state.board[r][c];
   if (!piece || piece.color !== state.turn) return [];
@@ -450,7 +448,7 @@ const PIECE_LETTER: Record<PieceType, string> = {
   p: '',
 };
 
-/** Best-effort SAN for display in the move list. */
+
 export function moveToSan(state: GameState, m: Move): string {
   if (m.isCastle) return m.isCastle === 'K' ? 'O-O' : 'O-O-O';
   const piece = state.board[m.fromR][m.fromC];

@@ -26,6 +26,8 @@
   font-weight: 700;
   font-size: 17px;
   color: var(--white);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .brand-mark {
