@@ -18,8 +18,24 @@ function ProfileCard({ p }: { p: SideProfile }) {
   const fullName = `${p.firstName} ${p.lastName}`.trim();
 
   return (
-    <section className={`profile-card${p.isTurn ? ' turn' : ''}`} aria-label={`${p.tag}: ${fullName}`}>
-      <span className="profile-tag">{p.tag}</span>
+    <section
+      className={`profile-card${p.isTurn ? ' turn' : ''}`}
+      aria-label={`${p.tag}: ${fullName}${p.isTurn ? ' — to move' : ''}`}
+      aria-current={p.isTurn ? 'true' : undefined}
+    >
+      <div className="profile-head">
+        <span className="profile-tag">{p.tag}</span>
+        {p.isTurn ? (
+          <span className="turn-pill" role="status" aria-live="polite">
+            <span className="turn-dot" aria-hidden="true" />
+            To move
+          </span>
+        ) : (
+          <span className="turn-pill idle" aria-hidden="true">
+            Waiting
+          </span>
+        )}
+      </div>
       <div className="profile-avatar">
         {p.photo ? (
           <img src={p.photo} alt={fullName} />

@@ -219,8 +219,135 @@
 }
 
 .profile-card.turn {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(172, 250, 0, 0.25), 0 4px 16px rgba(172, 250, 0, 0.15);
+}
+
+.profile-head {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.turn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(172, 250, 0, 0.5);
+  background: rgba(172, 250, 0, 0.14);
+  color: var(--green);
+  white-space: nowrap;
+}
+
+.turn-pill.idle {
+  border-color: rgba(217, 217, 217, 0.2);
+  background: transparent;
+  color: var(--gray);
+  opacity: 0.55;
+  font-weight: 600;
+}
+
+.turn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: turn-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes turn-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.65);
+    opacity: 0.55;
+  }
+}
+
+/* ---------- Turn status banner above the board ---------- */
+
+.turn-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(217, 217, 217, 0.18);
+  background: var(--row);
+  font-size: 14px;
+  color: var(--white);
+}
+
+.turn-status.mine {
+  border-color: rgba(172, 250, 0, 0.5);
+  background: rgba(172, 250, 0, 0.1);
+}
+
+.turn-status.over {
   border-color: rgba(172, 250, 0, 0.4);
-  box-shadow: 0 0 0 3px rgba(172, 250, 0, 0.15);
+  background: rgba(172, 250, 0, 0.08);
+}
+
+.turn-status strong {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.turn-status.mine strong {
+  color: var(--green);
+}
+
+.turn-status-detail {
+  font-size: 12px;
+  color: var(--white-o);
+}
+
+.turn-status-dot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--gray);
+  opacity: 0.6;
+}
+
+.turn-status-dot.mine {
+  background: var(--green);
+  opacity: 1;
+  box-shadow: 0 0 8px var(--green);
+  animation: turn-pulse 1.4s ease-in-out infinite;
+}
+
+.turn-status-dot.over {
+  background: var(--green);
+  opacity: 1;
+  box-shadow: none;
+  animation: none;
+}
+
+.turn-status-check {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: rgba(249, 1, 36, 0.15);
+  border: 1px solid var(--red);
+  color: #ff6b7e;
 }
 
 .profile-tag {
@@ -380,6 +507,7 @@
 }
 
 .board {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   height: 100%;
@@ -539,6 +667,141 @@
   pointer-events: none;
 }
 
+/* ---------- Move / capture animations ---------- */
+
+.piece.anim-land {
+  animation: land-pop 0.22s ease;
+}
+
+.sq.hit {
+  animation: sq-hit 0.32s ease;
+}
+
+.fly-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.fly-piece {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    left 0.28s cubic-bezier(0.2, 0.8, 0.3, 1),
+    top 0.28s cubic-bezier(0.2, 0.8, 0.3, 1);
+  will-change: left, top;
+}
+
+.fly-glyph {
+  font-size: clamp(28px, 5.5vw, 84px);
+  line-height: 1;
+  animation: fly-lift 0.3s ease;
+}
+
+.fly-piece.pw .fly-glyph {
+  color: #ffffff;
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000,
+    0 3px 4px rgba(0, 0, 0, 0.6);
+}
+
+.fly-piece.pb .fly-glyph {
+  color: #0d0d0d;
+  text-shadow:
+    -1px -1px 0 rgba(255, 255, 255, 0.9),
+    1px -1px 0 rgba(255, 255, 255, 0.9),
+    -1px 1px 0 rgba(255, 255, 255, 0.9),
+    1px 1px 0 rgba(255, 255, 255, 0.9),
+    0 3px 4px rgba(0, 0, 0, 0.5);
+}
+
+.capture-burst {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(172, 250, 0, 0.7) 0%,
+    rgba(172, 250, 0, 0.25) 45%,
+    transparent 70%
+  );
+  animation: burst-ring 0.34s ease-out;
+}
+
+@keyframes land-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes fly-lift {
+  0% {
+    transform: scale(0.92);
+  }
+  100% {
+    transform: scale(1.04);
+  }
+}
+
+@keyframes burst-ring {
+  0% {
+    transform: scale(0.4);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes sq-hit {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  50% {
+    transform: translateX(2px);
+  }
+  75% {
+    transform: translateX(-1px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .piece.anim-land,
+  .sq.hit,
+  .fly-glyph,
+  .capture-burst,
+  .turn-dot,
+  .turn-status-dot.mine {
+    animation: none;
+  }
+  .fly-layer {
+    display: none;
+  }
+  .fly-piece {
+    transition: none;
+  }
+}
+
 .side-card {
   width: 100%;
   flex-shrink: 0;
@@ -630,7 +893,7 @@
 
 .moves {
   margin: 0;
-  padding: 0 0 84px;
+  padding: 0 0 12px;
   list-style: none;
   background: transparent;
   flex: 1;
@@ -638,7 +901,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  justify-content: safe center;
+  justify-content: flex-start;
   gap: 6px;
   text-align: center;
 }
@@ -658,10 +921,44 @@
 
 .move-san {
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 88px;
+  justify-content: flex-start;
+}
+
+.move-piece {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4em;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.move-piece.pw {
+  color: #ffffff;
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000;
+}
+
+.move-piece.pb {
+  color: #0d0d0d;
+  text-shadow:
+    -1px -1px 0 rgba(255, 255, 255, 0.9),
+    1px -1px 0 rgba(255, 255, 255, 0.9),
+    -1px 1px 0 rgba(255, 255, 255, 0.9),
+    1px 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .moves-empty {
   color: var(--white-o);
+  margin: auto;
+  text-align: center;
 }
 
 .btn-row {

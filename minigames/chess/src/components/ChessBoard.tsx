@@ -1,19 +1,49 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getGameResult,
   legalMovesForSquare,
   squareName,
   type GameState,
   type Move,
+  type Piece,
   type PieceColor,
   type PieceType,
 } from "../chess/engine";
-import type { HistoryEntry } from "../net/useSyncedGame";
+import type { HistoryEntry } from "../net/history";
 
 const GLYPH: Record<PieceColor, Record<PieceType, string>> = {
   w: { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" },
   b: { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" },
 };
+
+const PIECE_NAME: Record<PieceType, string> = {
+  k: "King",
+  q: "Queen",
+  r: "Rook",
+  b: "Bishop",
+  n: "Knight",
+  p: "Pawn",
+};
+
+function MoveCell({ entry }: { entry: HistoryEntry | undefined }) {
+  if (!entry) return <span className="move-san" />;
+  const piece: Piece | undefined = entry.piece;
+  return (
+    <span className="move-san">
+      {piece && (
+        <span
+          className={`move-piece ${piece.color === "w" ? "pw" : "pb"}`}
+          role="img"
+          aria-label={PIECE_NAME[piece.type]}
+          title={PIECE_NAME[piece.type]}
+        >
+          {GLYPH[piece.color][piece.type]}
+        </span>
+      )}
+      {entry.san}
+    </span>
+  );
+}
 
 export type BoardControl = PieceColor | "both" | null;
 
@@ -43,8 +73,71 @@ export default function ChessBoard({
   );
   const [targets, setTargets] = useState<Move[]>([]);
   const [pendingPromotion, setPendingPromotion] = useState<Move[] | null>(null);
+  const movesRef = useRef<HTMLOListElement | null>(null);
+
+  // Keep the latest move visible as the list grows from the top.
+  useEffect(() => {
+    const el = movesRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [history.length]);
 
   const result = useMemo(() => getGameResult(game), [game]);
+
+  // --- Move / capture animation: fly the moved piece from -> to ---
+  const lastEntry = history.length > 0 ? history[history.length - 1] : null;
+  const [fly, setFly] = useState<{
+    id: number;
+    move: Move;
+    piece: Piece;
+    captured: boolean;
+    arrived: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!lastMove || !lastEntry?.piece) return;
+    try {
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)
+        return;
+    } catch {
+      // matchMedia unavailable — fall through to animated path
+    }
+    const id = history.length;
+    const captured =
+      lastEntry.captured !== null || lastMove.isEnPassant === true;
+    setFly({
+      id,
+      move: { ...lastMove },
+      piece: { ...lastEntry.piece },
+      captured,
+      arrived: false,
+    });
+    const raf = requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        setFly((f) => (f && f.id === id ? { ...f, arrived: true } : f)),
+      ),
+    );
+    const t = window.setTimeout(() => {
+      setFly((f) => (f && f.id === id ? null : f));
+    }, 340);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t);
+    };
+    // Animate once per new history entry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [history.length]);
+
+  const flyDestKey = fly ? `${fly.move.toR}-${fly.move.toC}` : null;
+  // Castled rook also teleports — give it a landing pop too.
+  const rookDestKey =
+    fly?.move.isCastle != null
+      ? (() => {
+          const homeRow = fly.piece.color === "w" ? 7 : 0;
+          return fly.move.isCastle === "K"
+            ? `${homeRow}-5`
+            : `${homeRow}-3`;
+        })()
+      : null;
 
   const rows = [0, 1, 2, 3, 4, 5, 6, 7];
   const cols = [0, 1, 2, 3, 4, 5, 6, 7];
@@ -114,9 +207,64 @@ export default function ChessBoard({
 
   const targetKeys = new Set(targets.map((t) => `${t.toR}-${t.toC}`));
 
+  const turnColorName = game.turn === 'w' ? 'White' : 'Black';
+  const turnStatus = (() => {
+    if (locked) return null;
+    if (result.over) {
+      return {
+        title: result.winner
+          ? `${result.reason} · ${result.winner === 'w' ? 'White' : 'Black'} wins`
+          : `${result.reason} · Draw`,
+        detail: 'Game over',
+        mine: false,
+        over: true as const,
+      };
+    }
+    if (myColor === 'both')
+      return {
+        title: `${turnColorName} to move`,
+        detail: 'Same-screen game',
+        mine: true,
+        over: false as const,
+      };
+    if (myColor === null)
+      return {
+        title: `${turnColorName} to move`,
+        detail: 'Spectating',
+        mine: false,
+        over: false as const,
+      };
+    const mine = game.turn === myColor;
+    return {
+      title: mine ? 'Your move' : "Opponent's move",
+      detail: mine
+        ? `You play ${turnColorName}`
+        : `${turnColorName} to move`,
+      mine,
+      over: false as const,
+    };
+  })();
+
   return (
     <div className="game-wrap">
       <div className="board-card">
+        {turnStatus && (
+          <div
+            className={`turn-status${turnStatus.mine ? ' mine' : ''}${turnStatus.over ? ' over' : ''}`}
+            role="status"
+            aria-live="polite"
+          >
+            <span
+              className={`turn-status-dot${turnStatus.over ? ' over' : turnStatus.mine ? ' mine' : ''}`}
+              aria-hidden="true"
+            />
+            <strong>{turnStatus.title}</strong>
+            <span className="turn-status-detail">{turnStatus.detail}</span>
+            {result.inCheck && !result.over && (
+              <span className="turn-status-check">Check!</span>
+            )}
+          </div>
+        )}
         <div className={`board-holder ${locked ? "is-locked" : ""}`}>
           <div className="board" role="grid" aria-label="Chess board">
             {rows.map((r) =>
@@ -131,6 +279,11 @@ export default function ChessBoard({
                     (lastMove.toR === r && lastMove.toC === c));
                 const isCheck = kingInCheck?.r === r && kingInCheck?.c === c;
                 const hasPiece = piece !== null;
+                const sqKey = `${r}-${c}`;
+                const isFlyDest = fly != null && sqKey === flyDestKey;
+                const isRookDest =
+                  rookDestKey != null && sqKey === rookDestKey;
+                const isLanding = isFlyDest || isRookDest;
                 return (
                   <button
                     key={`${r}-${c}`}
@@ -143,6 +296,7 @@ export default function ChessBoard({
                       isSel ? "sel" : "",
                       isLast ? "last" : "",
                       isCheck ? "check" : "",
+                      isFlyDest && fly?.captured ? "hit" : "",
                     ].join(" ")}
                     onClick={() => onSquare(r, c)}
                     disabled={locked}
@@ -153,9 +307,10 @@ export default function ChessBoard({
                     {r === 7 && (
                       <span className="coord file">{"abcdefgh"[c]}</span>
                     )}
-                    {piece && (
+                    {piece && !isFlyDest && (
                       <span
-                        className={`piece ${piece.color === "w" ? "pw" : "pb"}`}
+                        key={isLanding ? `land-${history.length}` : undefined}
+                        className={`piece ${piece.color === "w" ? "pw" : "pb"}${isLanding ? " anim-land" : ""}`}
                       >
                         {GLYPH[piece.color][piece.type]}
                       </span>
@@ -168,6 +323,31 @@ export default function ChessBoard({
                   </button>
                 );
               }),
+            )}
+            {fly && (
+              <div className="fly-layer" aria-hidden="true">
+                {fly.captured && (
+                  <span
+                    key={`burst-${fly.id}`}
+                    className="capture-burst"
+                    style={{
+                      left: `${(fly.move.toC * 100) / 8}%`,
+                      top: `${(fly.move.toR * 100) / 8}%`,
+                    }}
+                  />
+                )}
+                <div
+                  className={`fly-piece ${fly.piece.color === "w" ? "pw" : "pb"}${fly.arrived ? " arrived" : ""}`}
+                  style={{
+                    left: `${((fly.arrived ? fly.move.toC : fly.move.fromC) * 100) / 8}%`,
+                    top: `${((fly.arrived ? fly.move.toR : fly.move.fromR) * 100) / 8}%`,
+                  }}
+                >
+                  <span className="fly-glyph">
+                    {GLYPH[fly.piece.color][fly.piece.type]}
+                  </span>
+                </div>
+              </div>
             )}
           </div>
           {locked && (
@@ -183,7 +363,7 @@ export default function ChessBoard({
           <div className="moves-head">
             Moves · {Math.ceil(history.length / 2)}
           </div>
-          <ol className="moves">
+          <ol className="moves" ref={movesRef}>
             {history.length === 0 && (
               <li className="moves-empty">No moves yet</li>
             )}
@@ -191,10 +371,8 @@ export default function ChessBoard({
               (_, i) => (
                 <li key={i}>
                   <span className="move-no">{i + 1}.</span>
-                  <span className="move-san">{history[i * 2]?.san}</span>
-                  <span className="move-san">
-                    {history[i * 2 + 1]?.san ?? ""}
-                  </span>
+                  <MoveCell entry={history[i * 2]} />
+                  <MoveCell entry={history[i * 2 + 1]} />
                 </li>
               ),
             )}

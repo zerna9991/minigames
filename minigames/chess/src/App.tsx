@@ -1,8 +1,14 @@
 import { useEffect, useState, type ReactNode } from "react";
 import ChessBoard from "./components/ChessBoard";
+import HealthDot from "./components/HealthDot";
+import HistoryRoom from "./components/HistoryRoom";
+import InviteLobby from "./components/InviteLobby";
+import JoinRoom from "./components/JoinRoom";
+import PlayRoom from "./components/PlayRoom";
 import ProfileSidebar from "./components/ProfileSidebar";
+import WatchRoom from "./components/WatchRoom";
 import { resolveStudent } from "./data/students";
-import { useSyncedGame, type HistoryEntry } from "./net/useSyncedGame";
+import type { HistoryEntry } from "./net/history";
 import {
   applyMove,
   createInitialState,
@@ -19,20 +25,6 @@ function getParams(): URLSearchParams {
 
 function makeGameId(): string {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
-}
-
-/** Stable per-tab identity so two tabs never share a display name. */
-function tabName(fallback: string): string {
-  if (fallback) return fallback;
-  try {
-    const existing = sessionStorage.getItem("act-chess-you");
-    if (existing) return existing;
-    const fresh = `Player-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-    sessionStorage.setItem("act-chess-you", fresh);
-    return fresh;
-  } catch {
-    return "Player";
-  }
 }
 
 /* ---------------- Shared room chrome ---------------- */
@@ -58,117 +50,58 @@ function RoomShell(props: {
   );
 }
 
-/* ---------------- Online room: 2 players, handshake ---------------- */
+/* ---------------- Retired online room: BroadcastChannel path removed ---------------- */
 
-function OnlineRoom({ gameId, you }: { gameId: string; you: string }) {
-  const room = useSyncedGame(gameId, you);
-  const { opponent, bothJoined, bothReady, myReady, opponentReady } = room;
-
-  const myColorLabel =
-    room.myColor === "w"
-      ? "White"
-      : room.myColor === "b"
-        ? "Black"
-        : "Spectating";
-  const oppColor = opponent?.color ?? (room.myColor === "w" ? "b" : "w");
-  const myStudent = resolveStudent(you);
-  const oppStudent = opponent ? resolveStudent(opponent.name) : null;
-
+function RetiredOnlineRoom({ legacyGameId }: { legacyGameId: string | null }) {
   return (
-    <RoomShell
-      sidebar={
-        <ProfileSidebar
-          top={{
-            key: "opponent",
-            tag: "Opponent",
-            firstName: oppStudent?.firstName ?? "Waiting",
-            lastName: oppStudent?.lastName ?? "for opponent…",
-            faculty: oppStudent?.faculty ?? "—",
-            group: oppStudent?.group ?? "—",
-            photo: oppStudent?.photo ?? null,
-            colorLabel: oppColor === "w" ? "White" : "Black",
-            ready: bothJoined ? opponentReady : undefined,
-            isTurn: bothReady && room.game.turn === oppColor,
-          }}
-          bottom={{
-            key: "you",
-            tag: "You",
-            firstName: myStudent.firstName,
-            lastName: myStudent.lastName,
-            faculty: myStudent.faculty,
-            group: myStudent.group,
-            photo: myStudent.photo ?? null,
-            colorLabel: myColorLabel,
-            ready: bothJoined ? myReady : undefined,
-            isTurn:
-              bothReady &&
-              room.myColor !== null &&
-              room.game.turn === room.myColor,
-          }}
-        />
-      }
-      board={
-        <ChessBoard
-          game={room.game}
-          history={room.history}
-          lastMove={room.lastMove}
-          locked={!bothReady}
-          lockLabel={
-            !bothJoined ? "Waiting for opponent…" : "Press OK to start"
-          }
-          myColor={room.myColor === null ? null : room.myColor}
-          onMove={room.doMove}
-        />
-      }
-      modal={
-        bothJoined && !bothReady && opponent ? (
-          <div
-            className="overlay"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Welcome"
-          >
-            <div className="modal">
-              <p className="eyebrow">ACT Chess · Room {gameId}</p>
-              <h3>
-                Welcome to ACT Chess, you are now playing with {opponent.name}
-              </h3>
-              {!myReady ? (
-                <>
-                  <p className="muted">
-                    Press OK when you are ready. The board unlocks once both
-                    players press OK.
-                  </p>
-                  <button
-                    type="button"
-                    className="btn primary big"
-                    onClick={room.pressReady}
-                    autoFocus
-                  >
-                    OK
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="muted">
-                    You pressed OK. Waiting for {opponent.name} to press OK…
-                  </p>
-                  <button type="button" className="btn primary big" disabled>
-                    Waiting for {opponent.name}…
-                  </button>
-                </>
-              )}
-              <p className="hint">
-                {opponentReady
-                  ? `${opponent.name} is ready.`
-                  : `${opponent.name} has not pressed OK yet.`}{" "}
-                You play {myColorLabel}.
-              </p>
-            </div>
+    <div className="page">
+      <header className="topbar">
+        <span className="brand">
+          <span className="brand-mark">♞</span> ACT Chess
+        </span>
+        <HealthDot />
+      </header>
+      <div className="room-body" style={{ justifyContent: "center" }}>
+        <div className="modal" style={{ maxWidth: 520 }}>
+          <p className="eyebrow">Online play moved to the server</p>
+          <h3>Shareable ?game= rooms are retired</h3>
+          <p className="muted">
+            Same-browser BroadcastChannel rooms
+            {legacyGameId ? (
+              <>
+                {" "}
+                (room <code>{legacyGameId}</code>)
+              </>
+            ) : null}{" "}
+            are retired. Online games now run on the backend: invite links,
+            server-assigned colours, server-authoritative moves, clocks, and
+            resign/timeout.
+          </p>
+          <div className="btn-row">
+            <a
+              className="btn primary big"
+              href={`${window.location.pathname}?invite`}
+            >
+              Play online (invite)
+            </a>
+            <a
+              className="btn secondary big"
+              href={`${window.location.pathname}?local=1`}
+            >
+              Local 2-player
+            </a>
           </div>
-        ) : undefined
-      }
-    />
+          <p className="hint">
+            Flow: <code>?invite</code> to host,{" "}
+            <code>?join=&lt;token&gt;</code> to accept,{" "}
+            <code>?play=&lt;match_id&gt;</code> to play,{" "}
+            <code>?watch=&lt;match_id&gt;</code> to spectate,{" "}
+            <code>?history=&lt;student_id&gt;</code> for past games. Local same-screen
+            play (<code>?local=1</code>) stays fully offline.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -194,11 +127,15 @@ function LocalRoom({
 
   function doMove(m: Move) {
     const san = moveToSan(game, m);
+    const piece: Piece = game.board[m.fromR][m.fromC] ?? {
+      type: "p",
+      color: game.turn,
+    };
     const captured: Piece | null = m.isEnPassant
       ? { type: "p", color: game.turn === "w" ? "b" : "w" }
       : (game.board[m.toR][m.toC] ?? null);
     setGame(applyMove(game, m));
-    setHistory((h) => [...h, { san, move: m, captured }]);
+    setHistory((h) => [...h, { san, move: m, captured, piece }]);
     setLastMove(m);
   }
 
@@ -259,7 +196,7 @@ function LocalRoom({
               </h3>
               <p className="muted">
                 Each player presses their own OK. The board unlocks after both
-                press OK.
+                press OK — or skip it to test right now.
               </p>
               <div className="btn-row">
                 <button
@@ -279,6 +216,16 @@ function LocalRoom({
                   {blackOk ? `${blackName} ✓` : `${blackName} · OK`}
                 </button>
               </div>
+              <button
+                type="button"
+                className="btn ghost big"
+                onClick={() => {
+                  setWhiteOk(true);
+                  setBlackOk(true);
+                }}
+              >
+                Start now (test mode)
+              </button>
             </div>
           </div>
         ) : undefined
@@ -287,16 +234,36 @@ function LocalRoom({
   );
 }
 
-/* ---------------- App: straight into the room, no entry page ---------------- */
+/* ---------------- App: backend match flow + offline local ---------------- */
 
 type Route =
-  | { mode: "online"; gameId: string; you: string }
-  | { mode: "local"; gameId: string; whiteName: string; blackName: string };
+  | { mode: "local"; gameId: string; whiteName: string; blackName: string }
+  | { mode: "watch"; matchId: string }
+  | { mode: "play"; matchId: string }
+  | { mode: "invite" }
+  | { mode: "join"; token: string }
+  | { mode: "history"; studentId: string }
+  | { mode: "retired"; legacyGameId: string | null };
 
 function initialRoute(): Route {
   const q = getParams();
-  const game = (q.get("game") ?? "").trim().toUpperCase() || makeGameId();
+  // Backend spectator slice (step 1): read-only live view of a server match.
+  const watch = (q.get("watch") ?? "").trim();
+  if (watch) return { mode: "watch", matchId: watch };
+  // Backend lobby slice (step 2): invitation issue + accept.
+  // `?invite` (or `?invite=1`) hosts; `?join=<token>` accepts.
+  if (q.has("invite")) return { mode: "invite" };
+  const join = (q.get("join") ?? "").trim();
+  if (join) return { mode: "join", token: join };
+  // Server-authoritative play (steps 3–4): `?play=<match_id>`.
+  const play = (q.get("play") ?? "").trim();
+  if (play) return { mode: "play", matchId: play };
+  // Match history (optional step 5): `?history` or `?history=<student_id>`.
+  if (q.has("history"))
+    return { mode: "history", studentId: (q.get("history") ?? "").trim() };
+  // Offline local room (kept): `?local=1`.
   if (q.get("local") === "1") {
+    const game = (q.get("game") ?? "").trim().toUpperCase() || makeGameId();
     return {
       mode: "local",
       gameId: game,
@@ -304,27 +271,44 @@ function initialRoute(): Route {
       blackName: (q.get("black") ?? "").trim() || "Black",
     };
   }
-  return {
-    mode: "online",
-    gameId: game,
-    you: tabName((q.get("you") ?? "").trim()),
-  };
+  // Retired: legacy BroadcastChannel online rooms (`?game=`, `?you=`,
+  // `?solo=`, `?test=`, or bare root) now point at the backend match flow.
+  const legacyGame = (q.get("game") ?? "").trim().toUpperCase() || null;
+  return { mode: "retired", legacyGameId: legacyGame };
 }
 
 export default function App() {
   const [route] = useState<Route>(initialRoute);
 
-  // Keep the room shareable: ensure the URL carries ?game=… (no page change).
+  // Keep the local room shareable: ensure the URL carries ?game=… + ?local=1.
+  // Backend modes (watch/play/invite/join) and the retired notice own their
+  // URLs — nothing to persist.
   useEffect(() => {
+    if (route.mode !== "local") return;
     if (!getParams().get("game")) {
       window.history.replaceState(
         null,
         "",
-        `${window.location.pathname}?game=${route.gameId}`,
+        `${window.location.pathname}?local=1&game=${route.gameId}`,
       );
     }
-  }, [route.gameId]);
+  }, [route]);
 
+  if (route.mode === "watch") {
+    return <WatchRoom matchId={route.matchId} />;
+  }
+  if (route.mode === "play") {
+    return <PlayRoom matchId={route.matchId} />;
+  }
+  if (route.mode === "invite") {
+    return <InviteLobby />;
+  }
+  if (route.mode === "join") {
+    return <JoinRoom token={route.token} />;
+  }
+  if (route.mode === "history") {
+    return <HistoryRoom initialStudentId={route.studentId} />;
+  }
   if (route.mode === "local") {
     return (
       <LocalRoom
@@ -334,5 +318,5 @@ export default function App() {
       />
     );
   }
-  return <OnlineRoom gameId={route.gameId} you={route.you} />;
+  return <RetiredOnlineRoom legacyGameId={route.legacyGameId} />;
 }

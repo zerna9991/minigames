@@ -40,7 +40,8 @@ change to adopt the backend.
 |---|---|
 | `GET /health`, `GET /api/v1/matches/…` (reads + lists), both SSE streams | Public, none |
 | Invitations (`POST /invitations`, `POST /invitations/accept`, `GET/DELETE /invitations/me`), `POST /matches/ongoing/{id}/session` | Player credentials |
-| Moves, resign, timeout claim | Player credentials **+ `X-Game-Token`** |
+| Moves, resignations, timeout claims | Player credentials **+ `X-Game-Token`** |
+| `POST /api/v1/matches/completed/{match_id}/void` and `…/requeue` | Static admin token (`ADMIN_TOKEN`), as `Authorization: Bearer <token>` **or** `X-Admin-Token: <token>` (either works; with no `ADMIN_TOKEN` configured they always answer `401`) |
 | `GET /api-docs`, `GET /api-docs/openapi.json` | `Authorization: Bearer <ADMIN_TOKEN>` |
 
 Player credentials = **both** headers together:
@@ -164,9 +165,16 @@ paged via `limit/offset`.
 
 **`GET /api/v1/matches/completed?student_id=&limit=&offset=`** and
 **`GET /api/v1/matches/completed/{match_id}`** — same shape for finished
+
 games → `CompletedMatch` (includes `result: white|black|draw`,
 `termination`, `winner_id/loser_id` (null on draw), `ply`, `started_at`,
-`ended_at`, plus `settlement_state: pending|delivered|dead|null`).
+`ended_at`, plus `settlement_state: pending|delivered|dead|voided|null` —
+`null` when the match earned no points, i.e. a draw under the current v2
+policy). Lists are **newest-first** (`ended_at` then `match_id` for
+completed, `started_at` then `match_id` for ongoing), so paging never
+repeats or skips a row. Aborted matches never appear in the completed list
+— they are deleted, not recorded — and a match leaves the ongoing list the
+moment it ends.
 
 `OngoingMatch` fields (all required):
 
@@ -187,8 +195,9 @@ games → `CompletedMatch` (includes `result: white|black|draw`,
 **`POST /api/v1/matches/ongoing/{match_id}/session` — get your game token**
 (`issueGameSession`, player creds only) → `201 GameSession`
 `{match_id, student_id, side, token, issued_at}`. Only the two players may
-call (`403` otherwise); `409` in edge cases (e.g. match already over).
-This is the **inviter's** path to a token after learning `match_id` from
+call (`403` otherwise); `409` in edge cases (e.g. match already over). The token
+dies with the match, so a finished game has none — re-issuing after the end is
+`409`/`404`. This is the **inviter's** path to a token after learning `match_id` from
 their invitation stream's `accepted` event.
 
 **`POST /api/v1/matches/ongoing/{match_id}/moves` — play a move**
@@ -202,23 +211,53 @@ their invitation stream's `accepted` event.
 - `uci` required, `^ [a-h][1-8][a-h][1-8][qrbn]?$`; optional `ply` = the
   board you moved on — if the match moved on since, `409` instead of applying
   to a stale board. **Always send `ply`** when you have it.
-- Response is a `MatchOutcome` envelope with `status: ongoing|completed|aborted`
-  plus the resulting match object. A move can end the match (checkmate,
-  stalemate, repetition, fifty-move, insufficient material) or abort it (ended
+- Response is a `MatchOutcome` envelope: `{ match_id, status, ongoing, completed }`
+  where exactly one of `ongoing` / `completed` is set — except `aborted`,
+  where both are `null` (match deleted, no result/points). A move can end
+  the match (checkmate, stalemate, repetition, fifty-move, insufficient
+  material — draws are automatic, no claim needed) or abort it (ended
   before both sides moved → deleted, no result/points).
 - Time is enforced on action: moving after your flag fell ends the match on
-  time; either player may claim via `/timeout`. Clocks: 10 min/side + 5 s/move.
+  time **without playing the move** (still `200` with `status: completed` —
+  or `aborted` if both sides hadn't moved yet); either player may claim via
+  `/timeout`. Clocks: 10 min/side + 5 s/move (increment added after the move's
+  time is deducted).
 - Errors: `400` (bad UCI / illegal move / malformed id), `401/403` (auth or
   wrong/replaced game token or non-player), `404`, `409` (not your turn,
   stale `ply`, already completed).
 
 **`POST /api/v1/matches/ongoing/{match_id}/resign`** (`resignMatch`, no body)
-→ winner is the opponent; `MatchOutcome` envelope. Aborts (deletes) if both
-sides haven't moved yet.
+→ winner is the opponent; `MatchOutcome` envelope. Allowed on either player's
+turn. Aborts (deletes) if both sides haven't moved yet.
 
 **`POST /api/v1/matches/ongoing/{match_id}/timeout` — claim a win on time**
-(`claimTimeout`, no body) → `409` while time remains; otherwise ends match
-(`timeout`, win — or draw if the side with time left can't possibly mate).
+(`claimTimeout`, no body) → ends the match when the side to move has run out
+of time (win, or draw if the other side can't possibly mate); either player may
+call it. `409` while time remains; `aborted` before both sides moved.
+
+> Note: `Termination` includes `agreement`, but no endpoint offers, accepts,
+> or claims draws — draws are automatic, so `agreement` is unreachable through
+> this API. Do not build a draw-offer UI against it.
+
+#### Matches — admin settlement ops (admin token only, never from the game client)
+
+**`POST /api/v1/matches/completed/{match_id}/requeue`** (`requeueCompletedMatch`)
+— sets a `dead` or `voided` match's `settlement_state` back to `pending` with a
+fresh retry count; the delivery worker resends the points stored when the match
+ended (never recomputed). Returns the match. `409` when the match earned no
+points, or is already `pending`/`delivered`. Tip from the spec: a match that
+went `dead` because sport-tracking already holds a *different* settlement for
+it must be voided first — requeueing alone would only die again.
+Responses: `200,400,401,404,409,500`.
+
+**`POST /api/v1/matches/completed/{match_id}/void`** (`voidCompletedMatch`)
+— deletes every ledger row sport-tracking holds for the match, then sets
+`settlement_state` to `voided` so both services agree it pays nothing (e.g. match
+was cheated). Works on any settlement state; the match itself stays in results.
+**Idempotent**: voiding a `voided` match is a no-op, and retrying after a `502`
+is safe. To pay the match again, requeue it. `409` when it earned no points;
+`502` when sport-tracking is unreachable/refuses; `503` when no sport-tracking
+connection is configured. Responses: `200,400,401,404,409,500,502,503`.
 
 #### Match SSE stream (public)
 
@@ -232,11 +271,16 @@ sides haven't moved yet.
   move list, clocks), so a client that misses a frame is corrected by the
   next; reconnect just re-snapshots. No replay buffer: `Last-Event-ID` is
   accepted and **ignored**. `: keep-alive` comment every 15 s.
-- Reconnecting to an ended match replays its final event; max 200 watchers
-  per match (else `503` → fall back to `GET` polling). Writes never go
-  through the stream — moves still use `POST …/moves`.
+- Reconnecting to an ended match replays its final event (`game_over` or
+  `aborted`) and closes; reconnecting to one whose result was never recorded
+  is `404`. Max 200 watchers per match (else `503` → fall back to `GET`
+  polling). Writes never go through the stream — moves still use `POST …/moves`.
 - A clock running out produces **no event** until someone claims it via
-  `POST …/timeout`.
+  `POST …/timeout` — a client watching a clock hit zero must act on that
+  itself (count down locally between events; clocks are as of each event).
+- Note the read asymmetry: `GET …/ongoing/{match_id}` returns `404` once the
+  match has ended — look it up under `/completed` instead (aborted matches are
+  gone entirely), while the *stream* replays the final event.
 
 Example frame:
 
@@ -266,10 +310,20 @@ data: {"type":"game_over","completed":{"match_id":"01K5A7M3X2Q9RZ4T8B6N1C0D5E","
 
 ### 1.6 Points & settlement
 
-Policy v1: win 3, loss 1, draw 1 each. `settlement_state` on `CompletedMatch`:
-`pending` (queued/retrying) → `delivered`, or `dead` (rejected — services
-disagree, human must resolve). Delivery normally lands within ms of the final
-move; a sport-tracking outage only delays it (outbox + backoff retry).
+Policy **v2** (current): win **+3**, loss **−2**, draw **0** — a draw earns
+nothing, so its `settlement_state` is `null`. Matches that ended under policy
+v1 (win 3, loss 1, draw 1 each) keep what they earned. `settlement_state` on a
+`CompletedMatch` is therefore `pending` (queued/retrying) → `delivered`, or
+`dead` (rejected — services disagree, human must resolve: requeue, voiding
+first when sport-tracking holds a different settlement), or `voided` (an admin
+removed the points), or `null` (no points earned). Points are never recomputed:
+a requeue resends what the match earned when it ended. Delivery normally lands
+within ms of the final move; a sport-tracking outage only delays it (outbox +
+backoff retry).
+
+This service keeps **no rating, Elo, or leaderboard**. Rankings live in
+sport-tracking's `chess` board (`GET /api/v1/leaderboard?sport_tag=chess`),
+derived from settled points.
 
 ### 1.7 TypeScript fetch sketches
 
@@ -331,16 +385,16 @@ Every error is `{ "error": "<code>", "message": "diagnostics…" }`:
 | HTTP | `error` | Typical cause |
 |---|---|---|
 | 400 | `bad_request` | Malformed student/match ID, non-UCI or illegal move, wrong-typed query, non-JSON body |
-| 401 | `unauthorized` | Missing session token / missing-or-malformed `X-Student-Id`; bad admin token on docs |
+| 401 | `unauthorized` | Missing session token / missing-or-malformed `X-Student-Id`; missing or wrong admin token (docs, void, requeue); always `401` when no `ADMIN_TOKEN` is configured |
 | 403 | `forbidden` | Not a player in this match; missing/wrong/replaced `X-Game-Token`; student unknown to portal |
 | 404 | `not_found` | Unknown match; no open invitation; unknown/expired invitation token; unknown route |
 | 405 | `method_not_allowed` | Known path, wrong method (`Allow` lists valid ones) |
-| 409 | `conflict` | Not your turn; stale `ply`; match already completed; accepting own invitation; timeout claimed with time remaining |
+| 409 | `conflict` | Not your turn; stale `ply`; match already completed; accepting own invitation; timeout claimed with time remaining; voiding/requeueing a match that earned no points; requeueing one already `pending`/`delivered` |
 | 413 | `payload_too_large` | Body > 2 MB |
 | 415 | `unsupported_media_type` | JSON body without `Content-Type: application/json` |
 | 422 | `unprocessable_entity` | Valid JSON failing schema (missing/unknown/mistyped field — bodies are strict) |
 | 500 | `internal_error` | DB / I/O failure |
-| 502 | `bad_gateway` | Student portal unreachable (invitations only; games never call portal) |
+| 502 | `bad_gateway` | Student portal unreachable (invitations only; games never call portal) **or** sport-tracking unreachable/refusing on admin void |
 | 503 | `service_unavailable` | Stream refused — >200 watchers on that match/invitation |
 
 ---
@@ -351,10 +405,10 @@ Every error is `{ "error": "<code>", "message": "diagnostics…" }`:
 
 | File | Role |
 |---|---|
-| `src/App.tsx` | Routing + rooms. `OnlineRoom` (2 tabs handshake) and `LocalRoom` (same-screen). Query params: `?game=XXXXXX`, `?you=Name`, `?local=1&white=&black=`. `makeGameId()` = 6-char base36, `tabName()` via `sessionStorage`. `RoomShell` = topbar + sidebar + board + modal. |
+| `src/App.tsx` | Routing + rooms. `OnlineRoom` (2 tabs handshake) and `LocalRoom` (same-screen). Query params: `?game=XXXXXX`, `?you=Name`, `?local=1&white=&black=`, plus uncommitted test mode `?solo=1`/`?test=1` (play both sides on one screen, bypasses lobby). `makeGameId()` = 6-char base36, `tabName()` via `sessionStorage`. `RoomShell` = topbar + sidebar + board + modal. |
 | `src/net/useSyncedGame.ts` | **Replaces the entire backend today.** `BroadcastChannel('act-chess-'+gameId)` + `localStorage` seat claims (`act-chess-{gameId}-seats`, 120 s staleness) for White/Black assignment, `hello/bye/ready/move/sync-request/sync-state` messages, 1.5 s hello loop, 6 s peer pruning, `pressReady/doMove`. Same-browser-tabs only. |
 | `src/chess/engine.ts` | **Replaces server authority today.** Full client rules: pseudo+legal move gen, castling, en passant, promotion, check/checkmate/stalemate, fifty-move (halfmove ≥ 100), insufficient material (K vs K, K+minor vs K), SAN (`moveToSan`). Note: no threefold repetition, no clocks. |
-| `src/components/ChessBoard.tsx` | Board grid, selection/targets, promotion modal, last-move + check highlight, move list (SAN pairs), `locked` overlay, `myColor: 'w'|'b'|'both'|null` gating (`canMoveNow`). Consumes `Move {fromR,fromC,toR,toC,promotion?,isCastle?,isEnPassant?}` — **not UCI**. |
+| `src/components/ChessBoard.tsx` | Board grid, selection/targets, promotion modal, last-move + check highlight, move list (SAN pairs with piece glyphs), move/capture fly animation (340 ms, honors `prefers-reduced-motion`), `locked` overlay, `myColor: 'w'|'b'|'both'|null` gating (`canMoveNow`). Consumes `Move {fromR,fromC,toR,toC,promotion?,isCastle?,isEnPassant?}` — **not UCI**. `HistoryEntry` now also carries `piece` (the moved piece, for glyphs/animation). |
 | `src/components/ProfileSidebar.tsx` | Opponent/You cards (name, faculty, group, photo/initials avatar, color, Ready ✓, turn ring). |
 | `src/data/students.ts` | **Replaces the student portal today.** 3-entry static `DIRECTORY` + `resolveStudent()` with graceful fallback (`—` fields). No IDs in flow; names are free text. |
 | `src/main.tsx`, `index.css`, `App.css`, `design-system.md` | Bootstrap, styling, portal design tokens. No networking config; `vite.config.ts` is stock; no API base URL, no proxy, no env. |
@@ -375,7 +429,7 @@ Verified: **no `fetch`, no `EventSource`, no `Authorization`/`X-Student-Id`/
 | Moves (UCI `e2e4/e7e8q/e1g1`, server-validated, `ply` guard) | `Move` objects over `BroadcastChannel`, client-applied, no validation handshake | ❌ wire format differs | Add `Move ↔ UCI` codec (needs promotion piece + castling-as-king-move mapping; engine squares ↔ `a1–h8`). Always send `{uci, ply}`; on `409` stale-`ply`/not-your-turn, re-sync from `GET` match or last SSE snapshot. |
 | Board truth (server FEN + full `moves[]`) | Local `GameState{board,turn,castling,enPassant,halfmove,fullmove}` + `HistoryEntry{san,move,captured}` | ⚠️ convertible | Apply SSE `snapshot/move` full states (FEN→board or replay UCI list through engine for display); derive SAN locally via `moveToSan` for the move list. Server is truth; local engine is view/assist. |
 | Clocks (10 min + 5 s/move, `white_clock_ms/black_clock_ms`, `turn_started_at`, timeout claims) | None — no timers at all | ❌ missing UI + logic | New clock display (count down from last server timestamps + `increment_ms`); client clock is estimate only. Add claim-timeout button (`POST …/timeout`, `409` = too early) and handle flag-fall-on-move endings. Note: no SSE event for expiry — must poll/claim. |
-| Endings (server: checkmate/stalemate/repetition/fifty-move/insufficient + `resign`/`timeout`; `game_over/aborted` events; `CompletedMatch` + `settlement_state`) | Client `getGameResult` (checkmate/stalemate/fifty-move/insufficient only — **no repetition detection**) + no resign/timeout/abort | ⚠️ partial | Add Resign + Claim-timeout buttons; handle `game_over` (show `result/termination/winner_id`, points note win 3 / loss 1 / draw 1) and `aborted` (room deleted, no result). Add repetition detection locally only if needed for preview — server decides. |
+| Endings (server: checkmate/stalemate/repetition/fifty-move/insufficient + `resign`/`timeout`; `game_over/aborted` events; `CompletedMatch` + `settlement_state`) | Client `getGameResult` (checkmate/stalemate/fifty-move/insufficient only — **no repetition detection**) + no resign/timeout/abort | ⚠️ partial | Add Resign + Claim-timeout buttons; handle `game_over` (show `result/termination/winner_id`, points note v2: win +3 / loss −2 / draw 0) and `aborted` (room deleted, no result). Add repetition detection locally only if needed for preview — server decides. |
 | Live updates (SSE `snapshot/move/game_over/aborted`, `id: ply`, keep-alive 15 s, 200 watchers, `Last-Event-ID` ignored) | `BroadcastChannel` messages + full-state `sync-state` adoption if sender ahead | ❌ transport differs | Replace transport in `useSyncedGame` (or add `useServerGame`): `EventSource` for match stream + `POST` moves. Same "full-state wins" mental model already exists — easy port. Handle `503` → fallback to `GET` polling; reconnect → fresh snapshot. |
 | Lists (`GET ongoing/completed?student_id&limit&offset`, bare arrays) | None — no history, no match lookup | ❌ | New "My games / History" screens; page until `< limit`. Useful also for the `invitation-404 → find started match` recovery path. |
 | Errors (`ErrorBody`, strict bodies, 400/401/403/404/409/413/415/422/500/502/503) | Silent `try/catch` ignores (illegal remote move → `sync-request`) | ❌ | Surface toasts/errors per code: `409` = refresh + "not your turn/stale"; `403` = re-issue game token or wrong identity; `404` = invitation consumed/expired; `503` = polling fallback; `502` = portal down (invites only). |
@@ -399,9 +453,13 @@ Verified: **no `fetch`, no `EventSource`, no `Authorization`/`X-Student-Id`/
 
 ### 2.4 Suggested integration shape (no code changed yet)
 
+> Step 1 (done): read-only spectator slice — `src/net/api.ts` (public GETs,
+> SSE watcher, UCI/FEN codecs), `src/components/WatchRoom.tsx` (`?watch=`),
+> `src/vite-env.d.ts` for `VITE_CHESS_API`. No auth, no writes yet.
+
 - `src/net/api.ts` — `API_BASE` (env `VITE_CHESS_API`, default
-  `https://act.gormadatyan.xyz/chess`), typed `fetch` wrappers for all 15
-  endpoints, `ErrorBody` handling, `Move↔UCI` + FEN helpers.
+  `https://act.gormadatyan.xyz/chess`), typed `fetch` wrappers for all 17 player+
+  admin operations (game client needs only the 15 non-admin ones), `ErrorBody` handling, `Move↔UCI` + FEN helpers.
 - `src/net/useServerGame.ts` — `EventSource` match stream + `POST` moves
   (`{uci, ply}`), clock estimation, resign/timeout actions; same return shape
   as `useSyncedGame` so `ChessBoard`/`App` barely change.
@@ -431,5 +489,7 @@ Verified: **no `fetch`, no `EventSource`, no `Authorization`/`X-Student-Id`/
 - [ ] `POST /api/v1/matches/ongoing/{match_id}/moves {uci, ply?}`
 - [ ] `POST /api/v1/matches/ongoing/{match_id}/resign`
 - [ ] `POST /api/v1/matches/ongoing/{match_id}/timeout`
-- [ ] `GET /api/v1/matches/completed[?student_id&limit&offset]`
+- [ ] `GET /api/v1/matches/completed[?student_id&limit&offset]` (newest-first)
 - [ ] `GET /api/v1/matches/completed/{match_id}` (+ `settlement_state`)
+- [ ] `POST /api/v1/matches/completed/{match_id}/requeue` (admin — resend points)
+- [ ] `POST /api/v1/matches/completed/{match_id}/void` (admin — erase points)
