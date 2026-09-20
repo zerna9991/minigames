@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import ChessBoard from "./ChessBoard";
-import ProfileSidebar from "./ProfileSidebar";
-import { resolveStudent } from "../data/students";
+import ProfileSidebar, { type SideProfile } from "./ProfileSidebar";
+import { useStudent } from "../data/useStudent";
 import {
   ApiError,
   buildView,
-  claimTimeout,
   getCompletedMatch,
   getOngoingMatch,
   issueGameSession,
   moveToUci,
   playMove,
   pollMatch,
-  resignMatch,
   watchMatch,
   type CompletedMatch,
   type MatchOutcome,
@@ -79,6 +77,12 @@ function resultLabel(c: CompletedMatch): string {
 function friendlyWriteError(e: unknown): string {
   if (e instanceof ApiError) {
     if (e.status === 409) {
+      // Timeout claimed too early, e.g. "black still has 562258 ms left".
+      const left = /(white|black) still has (\d+) ?ms left/i.exec(e.message);
+      if (left) {
+        const side = left[1][0].toUpperCase() + left[1].slice(1).toLowerCase();
+        return `Too early to claim — ${side} still has ${formatClock(Number(left[2]))} on the clock.`;
+      }
       if (e.code === "stale_ply" || /stale/i.test(e.message))
         return "Board moved on — resynced to the latest position, try your move again.";
       if (/turn/i.test(e.message)) return "Not your turn (yet) — wait for the opponent.";
@@ -94,6 +98,12 @@ function friendlyWriteError(e: unknown): string {
     return `${e.code}: ${e.message}`;
   }
   return "Can't reach the chess server.";
+}
+
+/** Board to keep on a terminal update: repeat terminal notifications (write
+ *  response, then SSE `game_over`) must not wipe the final position. */
+function keptView(prev: Phase): MatchView | null {
+  return prev.kind === "live" || prev.kind === "over" ? prev.view : null;
 }
 
 type Phase =
@@ -122,9 +132,7 @@ export default function PlayRoom({ matchId }: { matchId: string }) {
     loadStoredSession(matchId) ? { kind: "loading" } : { kind: "need-token" },
   );
   const [notice, setNotice] = useState<string | null>(null);
-  const [polling, setPolling] = useState(false);
   const [sending, setSending] = useState(false);
-  const [confirmResign, setConfirmResign] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -190,7 +198,6 @@ export default function PlayRoom({ matchId }: { matchId: string }) {
     // (notably the spec's `503` over 200 watchers) degrades to `GET` polling.
     const startPolling = () => {
       if (cancelled || unpoll) return;
-      setPolling(true);
       unpoll = pollMatch(
         matchId,
         {
@@ -208,7 +215,7 @@ export default function PlayRoom({ matchId }: { matchId: string }) {
             setPhase((prev) => ({
               kind: "over",
               completed,
-              view: prev.kind === "live" ? prev.view : null,
+              view: keptView(prev),
             }));
           },
           onAborted: (id) => {
@@ -263,7 +270,7 @@ export default function PlayRoom({ matchId }: { matchId: string }) {
           setPhase((prev) => ({
             kind: "over",
             completed,
-            view: prev.kind === "live" ? prev.view : null,
+            view: keptView(prev),
           }));
         },
         onAborted: (id) => {
@@ -271,9 +278,6 @@ export default function PlayRoom({ matchId }: { matchId: string }) {
         },
         onError: () => {
           if (cancelled) return;
-          setNotice(
-            "Live stream interrupted — polling the server every few seconds…",
-          );
           startPolling();
         },
       });
@@ -306,17 +310,6 @@ export default function PlayRoom({ matchId }: { matchId: string }) {
     return { white, black };
   }, [live, live?.ongoing.ply, now]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // The server sends no event on flag-fall — only `POST …/timeout` ends the
-  // game. Nudge the player to claim when the local estimate hits zero.
-  const flaggedSide =
-    live && clocks
-      ? clocks.white <= 0
-        ? "White"
-        : clocks.black <= 0
-          ? "Black"
-          : null
-      : null;
-
   async function resync(reason: string) {
     try {
       const ongoing = await getOngoingMatch(matchId);
@@ -330,7 +323,7 @@ export default function PlayRoom({ matchId }: { matchId: string }) {
       if (err instanceof ApiError && err.status === 404) {
         try {
           const completed = await getCompletedMatch(matchId);
-          setPhase({ kind: "over", completed, view: null });
+          setPhase((prev) => ({ kind: "over", completed, view: keptView(prev) }));
           return;
         } catch {
           // fall through
@@ -352,7 +345,7 @@ export default function PlayRoom({ matchId }: { matchId: string }) {
       setPhase((prev) => ({
         kind: "over",
         completed: o.completed!,
-        view: prev.kind === "live" ? prev.view : null,
+        view: keptView(prev),
       }));
     } else {
       setPhase({ kind: "aborted", matchId: o.match_id });
@@ -385,39 +378,6 @@ export default function PlayRoom({ matchId }: { matchId: string }) {
     }
   }
 
-  async function onResign() {
-    if (!session || sending) return;
-    if (!confirmResign) {
-      setConfirmResign(true);
-      return;
-    }
-    setConfirmResign(false);
-    setSending(true);
-    setNotice(null);
-    try {
-      const outcome = await resignMatch(identity, session.token, matchId);
-      handleOutcome(outcome);
-    } catch (e) {
-      setNotice(friendlyWriteError(e));
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function onClaimTimeout() {
-    if (!session || sending) return;
-    setSending(true);
-    setNotice(null);
-    try {
-      const outcome = await claimTimeout(identity, session.token, matchId);
-      handleOutcome(outcome);
-    } catch (e) {
-      setNotice(friendlyWriteError(e));
-    } finally {
-      setSending(false);
-    }
-  }
-
   const myColor = useMemo(() => {
     const side = session?.side.toLowerCase();
     if (side === "white") return "w" as const;
@@ -429,17 +389,76 @@ export default function PlayRoom({ matchId }: { matchId: string }) {
     return null;
   }, [session?.side, live, identity.studentId]);
 
-  const whiteStudent = useMemo(
-    () => resolveStudent(live?.ongoing.white_id ?? "…"),
-    [live?.ongoing.white_id],
-  );
-  const blackStudent = useMemo(
-    () => resolveStudent(live?.ongoing.black_id ?? "…"),
-    [live?.ongoing.black_id],
-  );
+  const whiteStudent = useStudent(live?.ongoing.white_id ?? "…");
+  const blackStudent = useStudent(live?.ongoing.black_id ?? "…");
   const turn = live?.view.game.turn ?? null;
   const view =
     phase.kind === "live" ? phase.view : phase.kind === "over" ? phase.view : null;
+
+  // Your side sits at the bottom (board flipped for Black); the opponent on top.
+  const profileFor = (color: "w" | "b", mine: boolean): SideProfile => {
+    const student = color === "w" ? whiteStudent : blackStudent;
+    const colorLabel = color === "w" ? "White" : "Black";
+    const clock = clocks ? formatClock(color === "w" ? clocks.white : clocks.black) : null;
+    return {
+      key: color === "w" ? "white" : "black",
+      tag: `${mine ? "You" : "Opponent"} · ${colorLabel}${clock ? ` · ${clock}` : ""}`,
+      firstName: student.firstName,
+      lastName: student.lastName,
+      faculty: student.faculty,
+      group: student.group,
+      photo: student.photo ?? null,
+      colorLabel,
+      ready: undefined,
+      isTurn: turn === color,
+    };
+  };
+  const myProfile = profileFor(myColor ?? "w", true);
+  const opponentProfile = profileFor(myColor === "b" ? "w" : "b", false);
+
+  const identityPanel = (
+    <>
+      <IdentityFields value={identity} onChange={setIdentity} disabled={sending} />
+      {!isValidIdentity(identity) && (
+        <p className="hint">
+          Enter your student ID + session token first — moves, resign and
+          timeout claims all need player credentials plus your per-match game
+          token.
+        </p>
+      )}
+      {phase.kind === "need-token" && isValidIdentity(identity) && (
+        <>
+          <p className="muted">
+            No game token for this match yet. The accepter got one in the
+            invite response; the inviter issues theirs here (re-issuing
+            replaces the old token immediately).
+          </p>
+          <button
+            type="button"
+            className="btn primary big"
+            disabled={sending}
+            onClick={onIssueToken}
+          >
+            {sending ? "Issuing…" : "Get my game token"}
+          </button>
+        </>
+      )}
+      {session && (
+        <p className="hint">
+          Game token held for {session.studentId || "this student"}
+          {session.side ? ` · you play ${session.side}` : ""} ·{" "}
+          <button
+            type="button"
+            className="link-btn"
+            disabled={sending}
+            onClick={onIssueToken}
+          >
+            Re-issue token
+          </button>
+        </p>
+      )}
+    </>
+  );
 
   return (
     <div className="page">
@@ -449,167 +468,63 @@ export default function PlayRoom({ matchId }: { matchId: string }) {
         </span>
       </header>
       <div className="room-body">
-        <ProfileSidebar
-          top={{
-            key: "black",
-            tag: `Opponent · Black${clocks ? ` · ${formatClock(clocks.black)}` : ""}`,
-            firstName: blackStudent.firstName,
-            lastName: blackStudent.lastName,
-            faculty: blackStudent.faculty,
-            group: blackStudent.group,
-            photo: blackStudent.photo ?? null,
-            colorLabel: "Black",
-            ready: undefined,
-            isTurn: turn === "b",
-          }}
-          bottom={{
-            key: "white",
-            tag: `You · White${clocks ? ` · ${formatClock(clocks.white)}` : ""}`,
-            firstName: whiteStudent.firstName,
-            lastName: whiteStudent.lastName,
-            faculty: whiteStudent.faculty,
-            group: whiteStudent.group,
-            photo: whiteStudent.photo ?? null,
-            colorLabel: "White",
-            ready: undefined,
-            isTurn: turn === "w",
-          }}
-        />
+        <ProfileSidebar top={opponentProfile} bottom={myProfile} />
         <main className="room-main">
-          <div className="modal" style={{ maxWidth: 560 }}>
-            <p className="eyebrow">Backend match · steps 3–4</p>
-            <IdentityFields value={identity} onChange={setIdentity} disabled={sending} />
-            {!isValidIdentity(identity) && (
-              <p className="hint">
-                Enter your student ID + session token first — moves, resign and
-                timeout claims all need player credentials plus your per-match
-                game token.
-              </p>
-            )}
-            {phase.kind === "need-token" && isValidIdentity(identity) && (
-              <>
-                <p className="muted">
-                  No game token for this match yet. The accepter got one in the
-                  invite response; the inviter issues theirs here (re-issuing
-                  replaces the old token immediately).
-                </p>
-                <button
-                  type="button"
-                  className="btn primary big"
-                  disabled={sending}
-                  onClick={onIssueToken}
-                >
-                  {sending ? "Issuing…" : "Get my game token"}
-                </button>
-              </>
-            )}
-            {session && (
-              <p className="hint">
-                Game token held for {session.studentId || "this student"}
-                {session.side ? ` · you play ${session.side}` : ""} ·{" "}
-                <button
-                  type="button"
-                  className="link-btn"
-                  disabled={sending}
-                  onClick={onIssueToken}
-                >
-                  Re-issue token
-                </button>
-              </p>
-            )}
-            {notice && <p className="hint">{notice}</p>}
-          </div>
-
-          {phase.kind === "loading" && <p className="muted">Loading match {matchId}…</p>}
-          {phase.kind === "error" && (
-            <div className="modal">
-              <h3>Can't play this match</h3>
-              <p className="muted">{phase.message}</p>
-            </div>
-          )}
-          {phase.kind === "aborted" && (
-            <div className="modal">
-              <h3>Match aborted</h3>
-              <p className="muted">
-                {phase.matchId} ended before both sides moved — no result, no
-                points.
-              </p>
-            </div>
-          )}
-          {phase.kind === "over" && (
-            <p className="hint">
-              Final: {resultLabel(phase.completed)}
-              {phase.completed.settlement_state
-                ? ` · points ${phase.completed.settlement_state}`
-                : ""}
-            </p>
-          )}
-          {view && (
-            <>
-              <ChessBoard
-                game={view.game}
-                history={view.history}
-                lastMove={view.lastMove}
-                locked={phase.kind !== "live"}
-                lockLabel={
-                  phase.kind === "over"
-                    ? resultLabel(phase.completed)
-                    : sending
-                      ? "Sending…"
-                      : myColor === null
-                        ? "Not your seat — check your identity"
-                        : undefined
-                }
-                myColor={myColor}
-                onMove={onMove}
-              />
-              {phase.kind === "live" && (
-                <>
-                  {flaggedSide && (
-                    <p className="hint">
-                      {flaggedSide}'s clock hit zero (local estimate — the server
-                      sends no event until someone claims). Hit “Claim timeout”
-                      now — too early is just a 409.
+          {view ? (
+            <ChessBoard
+              game={view.game}
+              history={view.history}
+              lastMove={view.lastMove}
+              locked={phase.kind !== "live"}
+              lockLabel={
+                phase.kind === "over"
+                  ? resultLabel(phase.completed)
+                  : sending
+                    ? "Sending…"
+                    : myColor === null
+                      ? "Not your seat — check your identity"
+                      : undefined
+              }
+              myColor={myColor}
+              flipped={myColor === "b"}
+              onMove={onMove}
+            />
+          ) : (
+            <div className="room-stack">
+              <div className="modal" style={{ maxWidth: 560 }}>
+                <p className="eyebrow">Backend match · steps 3–4</p>
+                {identityPanel}
+                {notice && <p className="hint">{notice}</p>}
+              </div>
+              {phase.kind === "loading" && (
+                <p className="muted">Loading match {matchId}…</p>
+              )}
+              {phase.kind === "error" && (
+                <div className="modal">
+                  <h3>Can't play this match</h3>
+                  <p className="muted">{phase.message}</p>
+                </div>
+              )}
+              {phase.kind === "aborted" && (
+                <div className="modal">
+                  <h3>Match aborted</h3>
+                  <p className="muted">
+                    {phase.matchId} ended before both sides moved — no result, no
+                    points.
+                  </p>
+                </div>
+              )}
+              {phase.kind === "over" && (
+                <div className="modal">
+                  <h3>{resultLabel(phase.completed)}</h3>
+                  {phase.completed.settlement_state && (
+                    <p className="muted">
+                      Points {phase.completed.settlement_state}
                     </p>
                   )}
-                  {polling && (
-                    <p className="hint">
-                      Live stream busy — polling the server every few seconds.
-                    </p>
-                  )}
-                  <div className="btn-row">
-                    <button
-                      type="button"
-                      className={flaggedSide ? "btn primary" : "btn ghost"}
-                      disabled={sending}
-                      onClick={onClaimTimeout}
-                    >
-                      Claim timeout
-                    </button>
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    disabled={sending}
-                    onClick={onResign}
-                  >
-                    {confirmResign ? "Confirm resign?" : "Resign"}
-                  </button>
-                  {confirmResign && (
-                    <button
-                      type="button"
-                      className="link-btn"
-                      onClick={() => setConfirmResign(false)}
-                    >
-                      Keep playing
-                    </button>
-                  )}
-                  </div>
-                </>
+                </div>
               )}
-              {sending && phase.kind === "live" && (
-                <p className="hint">Sending to the server…</p>
-              )}
-            </>
+            </div>
           )}
         </main>
       </div>

@@ -6,6 +6,7 @@ import {
   type StartedMatch,
 } from "../net/api";
 import {
+  generateSessionToken,
   identityError,
   isValidIdentity,
   loadIdentity,
@@ -35,7 +36,14 @@ function friendlyAcceptError(e: unknown): string {
  * lives in PlayRoom (steps 3–4). The token is shown once — never logged.
  */
 export default function JoinRoom({ token }: { token: string }) {
-  const [identity, setIdentity] = useState<PlayerIdentity>(() => loadIdentity());
+  // The session token is generated for the player — no field, no typing.
+  const [identity, setIdentity] = useState<PlayerIdentity>(() => {
+    const saved = loadIdentity();
+    return {
+      ...saved,
+      sessionToken: saved.sessionToken.trim() || generateSessionToken(),
+    };
+  });
   const [started, setStarted] = useState<StartedMatch | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -99,7 +107,12 @@ export default function JoinRoom({ token }: { token: string }) {
           )}
           {!started ? (
             <>
-              <IdentityFields value={identity} onChange={setIdentity} disabled={busy} />
+              <IdentityFields
+                value={identity}
+                onChange={setIdentity}
+                disabled={busy}
+                hideToken
+              />
               <p className="hint">
                 Accepting consumes the link exactly once and assigns colours at
                 random. Each side gets 10 min + 5 s/move.

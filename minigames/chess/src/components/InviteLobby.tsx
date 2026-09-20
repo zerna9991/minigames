@@ -14,6 +14,8 @@ import {
 import {
   identityError,
   isValidIdentity,
+  isValidStudentId,
+  generateSessionToken,
   loadIdentity,
   saveIdentity,
 } from "../net/identity";
@@ -31,6 +33,42 @@ type Status =
   | "expired"
   | "error";
 
+/** True when this page load is a reload or back/forward, not a fresh visit. */
+function isRepeatNavigation(): boolean {
+  try {
+    const nav = performance.getEntriesByType("navigation")[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+    return nav?.type === "reload" || nav?.type === "back_forward";
+  } catch {
+    return false;
+  }
+}
+
+// GET /invitations/me never returns the link token, so keep the one this
+// tab issued (session-scoped) to show the link again after a reload.
+const LINK_KEY = "act-chess-invite-link";
+
+function saveIssuedToken(inv: IssuedInvitation): void {
+  try {
+    sessionStorage.setItem(LINK_KEY, JSON.stringify({ watch_key: inv.watch_key, token: inv.token }));
+  } catch {
+    // storage unavailable — a reload will offer "Re-issue link" instead
+  }
+}
+
+function loadIssuedToken(watchKey: string): string {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(LINK_KEY) ?? "null") as {
+      watch_key?: unknown;
+      token?: unknown;
+    } | null;
+    return saved?.watch_key === watchKey && typeof saved.token === "string" ? saved.token : "";
+  } catch {
+    return "";
+  }
+}
+
 function inviteLink(token: string): string {
   return `${window.location.origin}${window.location.pathname}?join=${encodeURIComponent(token)}`;
 }
@@ -45,8 +83,28 @@ function playUrl(matchId: string): string {
  * (step 3 token, stashed session-scoped for `?play=<match_id>`) and hands off
  * to the server-authoritative board (steps 3–4).
  */
-export default function InviteLobby() {
-  const [identity, setIdentity] = useState<PlayerIdentity>(() => loadIdentity());
+export default function InviteLobby({
+  presetStudentId = "",
+}: {
+  /** From `?student_id=` (the portal's Invite button): who is inviting. */
+  presetStudentId?: string;
+}) {
+  // Student ID from the portal is fixed: no field, no editing.
+  const lockedId = isValidStudentId(presetStudentId.toUpperCase());
+  const [identity, setIdentity] = useState<PlayerIdentity>(() => {
+    const saved = loadIdentity();
+    return {
+      studentId: lockedId ? presetStudentId.toUpperCase() : saved.studentId,
+      sessionToken: saved.sessionToken.trim() || generateSessionToken(),
+    };
+  });
+  // Arriving from the portal's Invite button: create the link right away.
+  // A reload or back/forward resumes the open invitation instead, so the
+  // link already sent to a friend keeps working.
+  const autoIssue = useRef(lockedId && !isRepeatNavigation());
+  // Set once this page issues a link: a resume (GET /me) must not then
+  // overwrite it with the token-less copy of the same invitation.
+  const issuedHere = useRef(false);
   const [issued, setIssued] = useState<IssuedInvitation | null>(null);
   // Resumed invitations have no token (GET /me omits it) — link can't be reshown.
   const [resumedNoToken, setResumedNoToken] = useState(false);
@@ -66,27 +124,32 @@ export default function InviteLobby() {
 
   // Resume a waiting screen after reload: GET /invitations/me.
   useEffect(() => {
-    if (!isValidIdentity(identity)) {
-      setStatus((s) => (s === "idle" ? s : s));
-      return;
+    if (autoIssue.current) {
+      autoIssue.current = false;
+      if (isValidIdentity(identity)) {
+        void onIssue();
+        return;
+      }
     }
+    if (!isValidIdentity(identity) || issuedHere.current) return;
     let cancelled = false;
     setStatus("resuming");
     getMyInvitation(identity)
       .then((me) => {
-        if (cancelled) return;
+        if (cancelled || issuedHere.current) return;
+        const token = loadIssuedToken(me.watch_key);
         setIssued({
-          token: "",
+          token,
           watch_key: me.watch_key,
           inviter_id: me.inviter_id,
           created_at: me.created_at,
           expires_at: me.expires_at,
         });
-        setResumedNoToken(true);
+        setResumedNoToken(!token);
         setStatus("waiting");
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (cancelled || issuedHere.current) return;
         if (err instanceof ApiError && err.status === 404) {
           setStatus("idle"); // no open invitation — normal case
         } else {
@@ -130,10 +193,7 @@ export default function InviteLobby() {
       onCancelled: () => setStatus("cancelled"),
       onReplaced: () => setStatus("replaced"),
       onExpired: () => setStatus("expired"),
-      onError: () => {
-        setMessage("Invitation stream busy — polling for the match every few seconds…");
-        startPolling();
-      },
+      onError: () => startPolling(),
     });
     return () => {
       unwatch();
@@ -181,6 +241,7 @@ export default function InviteLobby() {
       setMessage(err);
       return;
     }
+    issuedHere.current = true;
     setBusy(true);
     setMessage(null);
     setCopied(false);
@@ -191,6 +252,7 @@ export default function InviteLobby() {
     setPolling(false);
     try {
       const inv = await issueInvitation(identity);
+      saveIssuedToken(inv);
       setIssued(inv);
       setStatus("waiting");
     } catch (e) {
@@ -261,11 +323,14 @@ export default function InviteLobby() {
         <div className="modal" style={{ maxWidth: 520 }}>
           <p className="eyebrow">Backend lobby · step 2</p>
           <h3>Invite a friend</h3>
-          <IdentityFields
-            value={identity}
-            onChange={setIdentity}
-            disabled={waiting || status === "issuing"}
-          />
+          {!lockedId && (
+            <IdentityFields
+              value={identity}
+              onChange={setIdentity}
+              disabled={waiting || status === "issuing"}
+              hideToken
+            />
+          )}
 
           {status === "idle" || status === "error" || status === "issuing" ? (
             <>

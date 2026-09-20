@@ -7,21 +7,8 @@ export interface Student {
   photo?: string | null;
 }
 
-/** Sample directory (mirrors the portal sidebar card). Unknown names fall back gracefully. */
-const DIRECTORY: Student[] = [
-  { id: 'CS0103125', firstName: 'Գոռ', lastName: 'Մադաթյան', faculty: 'Computer Science', group: 'CS-11A' },
-  { id: 'CS0101042', firstName: 'Ani', lastName: 'Hakobyan', faculty: 'Computer Science', group: 'CS-12B' },
-  { id: 'CS0102087', firstName: 'Narek', lastName: 'Sargsyan', faculty: 'Business', group: 'BS-21A' },
-];
-
+/** Builds a Student from whatever the caller has — an id or a display name. */
 export function resolveStudent(displayName: string): Student {
-  const norm = displayName.trim().toLowerCase();
-  const byName = DIRECTORY.find(
-    (s) => `${s.firstName} ${s.lastName}`.toLowerCase() === norm,
-  );
-  if (byName) return byName;
-  const byId = DIRECTORY.find((s) => s.id.toLowerCase() === norm);
-  if (byId) return byId;
   const parts = displayName.trim().split(/\s+/);
   return {
     id: '—',

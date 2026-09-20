@@ -290,10 +290,6 @@
   color: var(--white);
 }
 
-.turn-status.mine {
-  border-color: rgba(172, 250, 0, 0.5);
-  background: rgba(172, 250, 0, 0.1);
-}
 
 .turn-status.over {
   border-color: rgba(172, 250, 0, 0.4);
@@ -305,9 +301,6 @@
   font-weight: 800;
 }
 
-.turn-status.mine strong {
-  color: var(--green);
-}
 
 .turn-status-detail {
   font-size: 12px;
@@ -323,12 +316,6 @@
   opacity: 0.6;
 }
 
-.turn-status-dot.mine {
-  background: var(--green);
-  opacity: 1;
-  box-shadow: 0 0 8px var(--green);
-  animation: turn-pulse 1.4s ease-in-out infinite;
-}
 
 .turn-status-dot.over {
   background: var(--green);
@@ -337,18 +324,6 @@
   animation: none;
 }
 
-.turn-status-check {
-  margin-left: auto;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 3px 10px;
-  border-radius: 20px;
-  background: rgba(249, 1, 36, 0.15);
-  border: 1px solid var(--red);
-  color: #ff6b7e;
-}
 
 .profile-tag {
   align-self: flex-start;
@@ -504,17 +479,20 @@
   align-items: center;
   justify-content: center;
   margin: 0;
+  /* Lets .board size itself to the largest square that fits. */
+  container-type: size;
 }
 
 .board {
   position: relative;
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  height: 100%;
-  width: auto;
-  max-width: 100%;
-  max-height: 100%;
+  grid-template-rows: repeat(8, 1fr);
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
   aspect-ratio: 1 / 1;
+  /* Pieces and labels scale with the board (cqw = 1% of board width). */
+  container-type: inline-size;
   margin: auto;
   border-radius: 12px;
   overflow: hidden;
@@ -553,7 +531,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 1 / 1;
+  min-width: 0;
+  min-height: 0;
 }
 
 .sq:disabled {
@@ -595,7 +574,7 @@
 }
 
 .piece {
-  font-size: clamp(28px, 5.5vw, 84px);
+  font-size: 9cqw; /* ≈ 72% of a square */
   line-height: 1;
   z-index: 1;
 }
@@ -622,7 +601,7 @@
 
 .coord {
   position: absolute;
-  font-size: 10px;
+  font-size: clamp(8px, 1.6cqw, 13px);
   font-weight: 700;
   opacity: 0.8;
   z-index: 1;
@@ -698,7 +677,7 @@
 }
 
 .fly-glyph {
-  font-size: clamp(28px, 5.5vw, 84px);
+  font-size: 9cqw; /* ≈ 72% of a square */
   line-height: 1;
   animation: fly-lift 0.3s ease;
 }
@@ -791,9 +770,6 @@
   .fly-glyph,
   .capture-burst,
   .turn-dot,
-  .turn-status-dot.mine {
-    animation: none;
-  }
   .fly-layer {
     display: none;
   }
@@ -810,6 +786,27 @@
   gap: 10px;
   min-height: 0;
   overflow-y: auto;
+}
+
+.right-col > .side-card {
+  max-height: 60%;
+}
+
+/* Lobby cards (invite / join / history) stay centred at every width. */
+.room-body > .modal {
+  margin-inline: auto;
+}
+
+/* Stacked panels in the main area when there's no board yet. */
+.room-stack {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
 }
 
 .right-col {
@@ -1087,6 +1084,8 @@
   .board-holder {
     width: 100%;
     height: auto;
+    /* Height is content-driven here; size containment would collapse it. */
+    container-type: normal;
   }
 
   .board {
@@ -1138,5 +1137,140 @@
 
   .profile-meta {
     font-size: 12px;
+  }
+}
+
+/* ---------- Mobile: opponent strip / board / your strip / controls ---------- */
+
+@media (max-width: 800px) {
+  .topbar {
+    padding: 10px 16px;
+  }
+
+  .brand {
+    font-size: 15px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .brand-mark {
+    width: 30px;
+    height: 30px;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  /* Flatten sidebar + board wrapper so the cards can sit around the board. */
+  .room-body {
+    padding: 12px 16px 16px;
+    gap: 10px;
+  }
+
+  .profiles,
+  .room-main,
+  .game-wrap {
+    display: contents;
+  }
+
+  .versus {
+    display: none;
+  }
+
+  .profile-card.slot-top {
+    order: 1;
+  }
+
+  .board-card {
+    order: 2;
+    flex: none;
+    padding: 8px;
+  }
+
+  .profile-card.slot-bottom {
+    order: 3;
+  }
+
+  .right-col {
+    order: 4;
+    width: 100%;
+    gap: 10px;
+  }
+
+  /* Compact player strip: avatar | name + tag | turn pill */
+  .profile-card {
+    flex: none;
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "avatar name foot"
+      "avatar head head";
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 2px;
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--dark);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .profile-avatar {
+    grid-area: avatar;
+    width: 44px;
+    border-width: 3px;
+  }
+
+  .profile-initials {
+    font-size: 16px;
+  }
+
+  .profile-name {
+    grid-area: name;
+    margin: 0;
+    font-size: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .profile-name br {
+    display: none;
+  }
+
+  .profile-head {
+    grid-area: head;
+    min-width: 0;
+  }
+
+  .profile-tag {
+    font-size: 11px;
+    align-self: center;
+  }
+
+  .turn-pill {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+
+  .profile-meta {
+    display: none;
+  }
+
+  .profile-foot {
+    grid-area: foot;
+    margin: 0;
+  }
+
+  /* The tag already names the colour; keep only the ready state here. */
+  .profile-foot .player-tag {
+    display: none;
+  }
+
+  .empty-box {
+    flex: none;
+    max-height: 220px;
+  }
+
+  .moves-head {
+    font-size: 13px;
   }
 }

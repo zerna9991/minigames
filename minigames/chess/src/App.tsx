@@ -7,7 +7,7 @@ import JoinRoom from "./components/JoinRoom";
 import PlayRoom from "./components/PlayRoom";
 import ProfileSidebar from "./components/ProfileSidebar";
 import WatchRoom from "./components/WatchRoom";
-import { resolveStudent } from "./data/students";
+import { useStudent } from "./data/useStudent";
 import type { HistoryEntry } from "./net/history";
 import {
   applyMove,
@@ -122,8 +122,8 @@ function LocalRoom({
   const [whiteOk, setWhiteOk] = useState(false);
   const [blackOk, setBlackOk] = useState(false);
   const bothReady = whiteOk && blackOk;
-  const whiteStudent = resolveStudent(whiteName);
-  const blackStudent = resolveStudent(blackName);
+  const whiteStudent = useStudent(whiteName);
+  const blackStudent = useStudent(blackName);
 
   function doMove(m: Move) {
     const san = moveToSan(game, m);
@@ -240,7 +240,7 @@ type Route =
   | { mode: "local"; gameId: string; whiteName: string; blackName: string }
   | { mode: "watch"; matchId: string }
   | { mode: "play"; matchId: string }
-  | { mode: "invite" }
+  | { mode: "invite"; studentId: string }
   | { mode: "join"; token: string }
   | { mode: "history"; studentId: string }
   | { mode: "retired"; legacyGameId: string | null };
@@ -252,7 +252,9 @@ function initialRoute(): Route {
   if (watch) return { mode: "watch", matchId: watch };
   // Backend lobby slice (step 2): invitation issue + accept.
   // `?invite` (or `?invite=1`) hosts; `?join=<token>` accepts.
-  if (q.has("invite")) return { mode: "invite" };
+  // `&student_id=` (sent by the portal's Invite button) creates the link at once.
+  if (q.has("invite"))
+    return { mode: "invite", studentId: (q.get("student_id") ?? "").trim() };
   const join = (q.get("join") ?? "").trim();
   if (join) return { mode: "join", token: join };
   // Server-authoritative play (steps 3–4): `?play=<match_id>`.
@@ -301,7 +303,7 @@ export default function App() {
     return <PlayRoom matchId={route.matchId} />;
   }
   if (route.mode === "invite") {
-    return <InviteLobby />;
+    return <InviteLobby presetStudentId={route.studentId} />;
   }
   if (route.mode === "join") {
     return <JoinRoom token={route.token} />;

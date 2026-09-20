@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   getGameResult,
   legalMovesForSquare,
@@ -57,6 +57,10 @@ interface Props {
   /** Which color this screen may move. 'both' = same-screen play, null = spectator. */
   myColor: BoardControl;
   onMove: (m: Move) => void;
+  /** Extra controls rendered above the move list (identity, resign, …). */
+  sidePanel?: ReactNode;
+  /** Draw the board from Black's side (a8 bottom-right). */
+  flipped?: boolean;
 }
 
 export default function ChessBoard({
@@ -67,6 +71,8 @@ export default function ChessBoard({
   lockLabel,
   myColor,
   onMove,
+  sidePanel,
+  flipped = false,
 }: Props) {
   const [selected, setSelected] = useState<{ r: number; c: number } | null>(
     null,
@@ -139,8 +145,11 @@ export default function ChessBoard({
         })()
       : null;
 
-  const rows = [0, 1, 2, 3, 4, 5, 6, 7];
-  const cols = [0, 1, 2, 3, 4, 5, 6, 7];
+  const order = [0, 1, 2, 3, 4, 5, 6, 7];
+  const rows = flipped ? [...order].reverse() : order;
+  const cols = rows;
+  // Board index → on-screen index (for the absolutely placed fly layer).
+  const view = (i: number) => (flipped ? 7 - i : i);
 
   const kingInCheck: { r: number; c: number } | null = (() => {
     if (!result.inCheck) return null;
@@ -207,62 +216,23 @@ export default function ChessBoard({
 
   const targetKeys = new Set(targets.map((t) => `${t.toR}-${t.toC}`));
 
-  const turnColorName = game.turn === 'w' ? 'White' : 'Black';
-  const turnStatus = (() => {
-    if (locked) return null;
-    if (result.over) {
-      return {
-        title: result.winner
-          ? `${result.reason} · ${result.winner === 'w' ? 'White' : 'Black'} wins`
-          : `${result.reason} · Draw`,
-        detail: 'Game over',
-        mine: false,
-        over: true as const,
-      };
-    }
-    if (myColor === 'both')
-      return {
-        title: `${turnColorName} to move`,
-        detail: 'Same-screen game',
-        mine: true,
-        over: false as const,
-      };
-    if (myColor === null)
-      return {
-        title: `${turnColorName} to move`,
-        detail: 'Spectating',
-        mine: false,
-        over: false as const,
-      };
-    const mine = game.turn === myColor;
-    return {
-      title: mine ? 'Your move' : "Opponent's move",
-      detail: mine
-        ? `You play ${turnColorName}`
-        : `${turnColorName} to move`,
-      mine,
-      over: false as const,
-    };
-  })();
+  // Only the game-over result is announced above the board; whose turn it
+  // is shows on the player cards.
+  const overTitle =
+    !locked && result.over
+      ? result.winner
+        ? `${result.reason} · ${result.winner === "w" ? "White" : "Black"} wins`
+        : `${result.reason} · Draw`
+      : null;
 
   return (
     <div className="game-wrap">
       <div className="board-card">
-        {turnStatus && (
-          <div
-            className={`turn-status${turnStatus.mine ? ' mine' : ''}${turnStatus.over ? ' over' : ''}`}
-            role="status"
-            aria-live="polite"
-          >
-            <span
-              className={`turn-status-dot${turnStatus.over ? ' over' : turnStatus.mine ? ' mine' : ''}`}
-              aria-hidden="true"
-            />
-            <strong>{turnStatus.title}</strong>
-            <span className="turn-status-detail">{turnStatus.detail}</span>
-            {result.inCheck && !result.over && (
-              <span className="turn-status-check">Check!</span>
-            )}
+        {overTitle && (
+          <div className="turn-status over" role="status" aria-live="polite">
+            <span className="turn-status-dot over" aria-hidden="true" />
+            <strong>{overTitle}</strong>
+            <span className="turn-status-detail">Game over</span>
           </div>
         )}
         <div className={`board-holder ${locked ? "is-locked" : ""}`}>
@@ -301,10 +271,10 @@ export default function ChessBoard({
                     onClick={() => onSquare(r, c)}
                     disabled={locked}
                   >
-                    {c === 0 && (
+                    {c === cols[0] && (
                       <span className="coord rank">{8 - r}</span>
                     )}
-                    {r === 7 && (
+                    {r === rows[7] && (
                       <span className="coord file">{"abcdefgh"[c]}</span>
                     )}
                     {piece && !isFlyDest && (
@@ -331,16 +301,16 @@ export default function ChessBoard({
                     key={`burst-${fly.id}`}
                     className="capture-burst"
                     style={{
-                      left: `${(fly.move.toC * 100) / 8}%`,
-                      top: `${(fly.move.toR * 100) / 8}%`,
+                      left: `${(view(fly.move.toC) * 100) / 8}%`,
+                      top: `${(view(fly.move.toR) * 100) / 8}%`,
                     }}
                   />
                 )}
                 <div
                   className={`fly-piece ${fly.piece.color === "w" ? "pw" : "pb"}${fly.arrived ? " arrived" : ""}`}
                   style={{
-                    left: `${((fly.arrived ? fly.move.toC : fly.move.fromC) * 100) / 8}%`,
-                    top: `${((fly.arrived ? fly.move.toR : fly.move.fromR) * 100) / 8}%`,
+                    left: `${(view(fly.arrived ? fly.move.toC : fly.move.fromC) * 100) / 8}%`,
+                    top: `${(view(fly.arrived ? fly.move.toR : fly.move.fromR) * 100) / 8}%`,
                   }}
                 >
                   <span className="fly-glyph">
@@ -359,6 +329,7 @@ export default function ChessBoard({
       </div>
 
       <div className="right-col">
+        {sidePanel && <div className="side-card">{sidePanel}</div>}
         <div className="empty-box">
           <div className="moves-head">
             Moves · {Math.ceil(history.length / 2)}

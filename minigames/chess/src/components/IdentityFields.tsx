@@ -28,10 +28,13 @@ export default function IdentityFields({
   value,
   onChange,
   disabled,
+  hideToken = false,
 }: {
   value: PlayerIdentity;
   onChange: (next: PlayerIdentity) => void;
   disabled?: boolean;
+  /** Token is generated for the player — don't show or allow editing it. */
+  hideToken?: boolean;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -48,6 +51,7 @@ export default function IdentityFields({
           }
         />
       </label>
+      {!hideToken && (
       <label style={labelStyle}>
         Portal session token
         <input
@@ -60,6 +64,7 @@ export default function IdentityFields({
           onChange={(e) => onChange({ ...value, sessionToken: e.target.value })}
         />
       </label>
+      )}
     </div>
   );
 }

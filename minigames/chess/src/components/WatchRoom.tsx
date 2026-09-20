@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ChessBoard from "./ChessBoard";
 import ProfileSidebar from "./ProfileSidebar";
-import { resolveStudent } from "../data/students";
+import { useStudent } from "../data/useStudent";
 import {
   ApiError,
   buildView,
@@ -25,6 +25,12 @@ function resultLabel(c: CompletedMatch): string {
   if (c.result === "draw") return `Draw · ${c.termination.replace(/_/g, " ")}`;
   const winner = c.result === "white" ? c.white_id : c.black_id;
   return `${winner} wins · ${c.termination.replace(/_/g, " ")}`;
+}
+
+/** Board to keep on a terminal update: repeat terminal notifications (write
+ *  response, then SSE `game_over`) must not wipe the final position. */
+function keptView(prev: Phase): MatchView | null {
+  return prev.kind === "live" || prev.kind === "over" ? prev.view : null;
 }
 
 type Phase =
@@ -64,7 +70,7 @@ export default function WatchRoom({ matchId }: { matchId: string }) {
           setPhase((prev) => ({
             kind: "over",
             completed,
-            view: prev.kind === "live" ? prev.view : null,
+            view: keptView(prev),
           }));
         },
         onAborted: (id) => {
@@ -124,7 +130,7 @@ export default function WatchRoom({ matchId }: { matchId: string }) {
           setPhase((prev) => ({
             kind: "over",
             completed,
-            view: prev.kind === "live" ? prev.view : null,
+            view: keptView(prev),
           }));
         },
         onAborted: (id) => {
@@ -164,18 +170,14 @@ export default function WatchRoom({ matchId }: { matchId: string }) {
     return { white, black };
   }, [live, live?.ongoing.ply, now]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const whiteStudent = useMemo(() => {
-    const id =
-      live?.ongoing.white_id ??
-      (phase.kind === "over" ? phase.completed.white_id : "…");
-    return resolveStudent(id);
-  }, [live?.ongoing.white_id, phase]);
-  const blackStudent = useMemo(() => {
-    const id =
-      live?.ongoing.black_id ??
-      (phase.kind === "over" ? phase.completed.black_id : "…");
-    return resolveStudent(id);
-  }, [live?.ongoing.black_id, phase]);
+  const whiteStudent = useStudent(
+    live?.ongoing.white_id ??
+      (phase.kind === "over" ? phase.completed.white_id : "…"),
+  );
+  const blackStudent = useStudent(
+    live?.ongoing.black_id ??
+      (phase.kind === "over" ? phase.completed.black_id : "…"),
+  );
 
   const turn = live?.view.game.turn ?? null;
   const view =
@@ -196,7 +198,7 @@ export default function WatchRoom({ matchId }: { matchId: string }) {
         <ProfileSidebar
           top={{
             key: "black",
-            tag: `Opponent · Black${clocks ? ` · ${formatClock(clocks.black)}` : ""}`,
+            tag: `Black${clocks ? ` · ${formatClock(clocks.black)}` : ""}`,
             firstName: blackStudent.firstName,
             lastName: blackStudent.lastName,
             faculty: blackStudent.faculty,
@@ -243,36 +245,40 @@ export default function WatchRoom({ matchId }: { matchId: string }) {
             </div>
           )}
           {view && (
-            <>
-              {streamDown && phase.kind === "live" && (
-                <p className="hint">
-                  {polling
-                    ? "Live stream busy — polling the server every few seconds."
-                    : "Live stream interrupted — showing the last snapshot. Reload to reconnect."}
-                </p>
-              )}
-              {phase.kind === "over" && (
-                <p className="hint">
-                  Final: {resultLabel(phase.completed)}
-                  {phase.completed.settlement_state
-                    ? ` · points ${phase.completed.settlement_state}`
-                    : ""}
-                </p>
-              )}
-              <ChessBoard
-                game={view.game}
-                history={view.history}
-                lastMove={view.lastMove}
-                locked
-                lockLabel={
-                  phase.kind === "over"
-                    ? resultLabel(phase.completed)
-                    : "Spectating · live"
-                }
-                myColor={null}
-                onMove={() => {}}
-              />
-            </>
+            <ChessBoard
+              game={view.game}
+              history={view.history}
+              lastMove={view.lastMove}
+              locked
+              lockLabel={
+                phase.kind === "over"
+                  ? resultLabel(phase.completed)
+                  : "Spectating · live"
+              }
+              myColor={null}
+              onMove={() => {}}
+              sidePanel={
+                (streamDown && phase.kind === "live") || phase.kind === "over" ? (
+                  <>
+                    {streamDown && phase.kind === "live" && (
+                      <p className="hint">
+                        {polling
+                          ? "Live stream busy — polling the server every few seconds."
+                          : "Live stream interrupted — showing the last snapshot. Reload to reconnect."}
+                      </p>
+                    )}
+                    {phase.kind === "over" && (
+                      <p className="hint">
+                        Final: {resultLabel(phase.completed)}
+                        {phase.completed.settlement_state
+                          ? ` · points ${phase.completed.settlement_state}`
+                          : ""}
+                      </p>
+                    )}
+                  </>
+                ) : undefined
+              }
+            />
           )}
           {phase.kind === "over" && !phase.view && (
             <div className="modal">

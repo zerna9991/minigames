@@ -30,6 +30,14 @@ export function saveIdentity(id: PlayerIdentity): void {
   }
 }
 
+/** A random dev session token. The server doesn't verify portal sessions yet
+ *  (any non-blank token works), so the player never has to type one. */
+export function generateSessionToken(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return `dev-${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
 export function isValidStudentId(id: string): boolean {
   return STUDENT_RE.test(id.trim());
 }

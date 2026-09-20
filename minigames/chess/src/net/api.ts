@@ -288,16 +288,34 @@ export function watchInvitation(
   const es = new EventSource(
     `${API_BASE}/api/v1/invitations/watch/${encodeURIComponent(watchKey)}/events`,
   );
+  // The server closes the stream after the terminal frame; close our side
+  // too, or `EventSource` auto-reconnects and reports a spurious error.
+  let done = false;
+  const terminal = (fn: () => void) => {
+    done = true;
+    es.close();
+    fn();
+  };
   es.addEventListener("waiting", () => handlers.onWaiting());
   es.addEventListener("accepted", (e) => {
     const matchId = parseData(e)?.match_id;
-    handlers.onAccepted(typeof matchId === "string" ? matchId : "");
+    terminal(() => handlers.onAccepted(typeof matchId === "string" ? matchId : ""));
   });
-  es.addEventListener("cancelled", () => handlers.onCancelled());
-  es.addEventListener("replaced", () => handlers.onReplaced());
-  es.addEventListener("expired", () => handlers.onExpired());
-  es.onerror = () => handlers.onError?.();
-  return () => es.close();
+  es.addEventListener("cancelled", () => terminal(handlers.onCancelled));
+  es.addEventListener("replaced", () => terminal(handlers.onReplaced));
+  es.addEventListener("expired", () => terminal(handlers.onExpired));
+  es.onerror = () => {
+    if (done) return;
+    // Hand over to the caller's fallback instead of letting the browser
+    // retry the same URL forever (e.g. a 404 for a consumed invitation).
+    done = true;
+    es.close();
+    handlers.onError?.();
+  };
+  return () => {
+    done = true;
+    es.close();
+  };
 }
 
 /* ---------------- Server-authoritative play (steps 3–4) ---------------- */
@@ -572,16 +590,32 @@ export function watchMatch(
       handlers.onMove(ongoing, typeof data?.uci === "string" ? data.uci : "");
     }
   });
+  // The server closes the stream after `game_over`/`aborted`. Close our side
+  // on the terminal frame, or `EventSource` auto-reconnects, the server
+  // replays the final event, closes again, and so on forever.
+  let done = false;
+  const close = () => {
+    done = true;
+    es.close();
+  };
   es.addEventListener("game_over", (e) => {
     const completed = parseData(e)?.completed;
+    close();
     if (isCompleted(completed)) handlers.onGameOver(completed);
   });
   es.addEventListener("aborted", (e) => {
     const id = parseData(e)?.match_id;
+    close();
     handlers.onAborted(typeof id === "string" ? id : matchId);
   });
-  es.onerror = () => handlers.onError?.();
-  return () => es.close();
+  es.onerror = () => {
+    if (done) return;
+    // Hand over to the caller's polling fallback rather than running the
+    // browser's auto-reconnect alongside it.
+    close();
+    handlers.onError?.();
+  };
+  return close;
 }
 
 /* ----------- GET-polling fallback (503 >200-watchers path) ----------- */
@@ -591,8 +625,9 @@ export function watchMatch(
  * match/invitation) or drops. `EventSource` never surfaces the HTTP status,
  * so every stream `onError` degrades to plain `GET` polling here instead of
  * asking the user to reload: poll `GET ongoing/{id}` (404 → `GET
- * completed/{id}` for the final result) and feed the same handler shape as
- * `watchMatch`. Returns an unsubscribe function.
+ * completed/{id}` for the final result, 404 there too → aborted) and feed
+ * the same handler shape as `watchMatch`. Stops by itself after a terminal
+ * result. Returns an unsubscribe function.
  */
 export function pollMatch(
   matchId: string,
@@ -601,6 +636,10 @@ export function pollMatch(
 ): () => void {
   let stopped = false;
   let timer: number | null = null;
+  const stop = () => {
+    stopped = true;
+    if (timer !== null) window.clearInterval(timer);
+  };
   const tick = async () => {
     try {
       const ongoing = await getOngoingMatch(matchId);
@@ -610,10 +649,19 @@ export function pollMatch(
       if (err instanceof ApiError && err.status === 404) {
         try {
           const completed = await getCompletedMatch(matchId);
-          if (!stopped) handlers.onGameOver(completed);
+          if (stopped) return;
+          stop();
+          handlers.onGameOver(completed);
           return;
-        } catch {
-          // fall through to onError below
+        } catch (err2) {
+          if (stopped) return;
+          // Gone from both lists: aborted matches are deleted, not recorded.
+          if (err2 instanceof ApiError && err2.status === 404) {
+            stop();
+            handlers.onAborted(matchId);
+            return;
+          }
+          // otherwise fall through to onError below
         }
       }
       handlers.onError?.();
@@ -621,10 +669,7 @@ export function pollMatch(
   };
   void tick();
   timer = window.setInterval(() => void tick(), intervalMs);
-  return () => {
-    stopped = true;
-    if (timer !== null) window.clearInterval(timer);
-  };
+  return stop;
 }
 
 /**

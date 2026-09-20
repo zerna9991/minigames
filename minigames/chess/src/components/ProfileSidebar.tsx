@@ -14,12 +14,12 @@ export interface SideProfile {
   isTurn?: boolean;
 }
 
-function ProfileCard({ p }: { p: SideProfile }) {
+function ProfileCard({ p, slot }: { p: SideProfile; slot: 'top' | 'bottom' }) {
   const fullName = `${p.firstName} ${p.lastName}`.trim();
 
   return (
     <section
-      className={`profile-card${p.isTurn ? ' turn' : ''}`}
+      className={`profile-card slot-${slot}${p.isTurn ? ' turn' : ''}`}
       aria-label={`${p.tag}: ${fullName}${p.isTurn ? ' — to move' : ''}`}
       aria-current={p.isTurn ? 'true' : undefined}
     >
@@ -52,6 +52,7 @@ function ProfileCard({ p }: { p: SideProfile }) {
         {p.firstName}
         {p.lastName && (
           <>
+            {' '}
             <br />
             {p.lastName}
           </>
@@ -88,11 +89,11 @@ export default function ProfileSidebar({
 }) {
   return (
     <aside className="profiles" aria-label="Players">
-      <ProfileCard key={top.key} p={top} />
+      <ProfileCard key={top.key} p={top} slot="top" />
       <div className="versus" aria-hidden="true">
         <span>VS</span>
       </div>
-      <ProfileCard key={bottom.key} p={bottom} />
+      <ProfileCard key={bottom.key} p={bottom} slot="bottom" />
     </aside>
   );
 }
