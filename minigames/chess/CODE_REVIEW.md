@@ -14,26 +14,26 @@ cleanup and polish.
 
 ## Summary
 
-| # | Severity | Area | Problem |
-|---|----------|------|---------|
-| 1 | Critical | Auth (backend + client) | Anyone can play, resign or claim a timeout in someone else's match |
-| 2 | High | SSE / polling | The server closing the stream after game end starts reconnect and poll loops that never stop |
-| 3 | High | Play / Watch | The final board disappears right after the game ends |
-| 4 | High | Play | The board never flips for Black, and the sidebar always labels White as "You" |
-| 5 | High | Polling fallback | `pollMatch` can't detect an aborted match and retries forever |
-| 6 | Medium | Invite | The polling fallback and "Look up my match" can pick up the wrong match |
-| 7 | Medium | Invite | Invitation polling never stops once the invitation is cancelled or expires |
-| 8 | Medium | Invite | Typing credentials fires a request on every keystroke and disables the form mid-typing |
-| 9 | Medium | Play | Editing the student ID one character at a time deletes the stored game token |
-| 10 | Medium | Play | 409 handling depends on error codes and message text the server doesn't send |
-| 11 | Medium | Network | No request timeouts, so a hung request locks the play controls |
-| 12 | Medium | Play | A move made while another request is in flight is silently dropped |
-| 13 | Medium | History | Offset paging over a newest-first list gives duplicates and React key collisions |
-| 14 | Medium | Clocks | Clock estimates use the client's wall clock, so clock skew shows wrong times |
-| 15 | Low | Engine | SAN, insufficient-material and repetition gaps |
-| 16 | Low | UX / copy | Development-process text shown in the UI, wrong labels, inconsistent token handling |
-| 17 | Low | Maintainability | Duplicated helpers, a storage key written in three places, dead code, stale lint suppressions |
-| 18 | Low | Project hygiene | Template README, placeholder package name, no tests, no env docs, `NOTES.md` inconsistencies |
+| #   | Severity | Area                    | Problem                                                                                       |
+| --- | -------- | ----------------------- | --------------------------------------------------------------------------------------------- |
+| 1   | Critical | Auth (backend + client) | Anyone can play, resign or claim a timeout in someone else's match                            |
+| 2   | High     | SSE / polling           | The server closing the stream after game end starts reconnect and poll loops that never stop  |
+| 3   | High     | Play / Watch            | The final board disappears right after the game ends                                          |
+| 4   | High     | Play                    | The board never flips for Black, and the sidebar always labels White as "You"                 |
+| 5   | High     | Polling fallback        | `pollMatch` can't detect an aborted match and retries forever                                 |
+| 6   | Medium   | Invite                  | The polling fallback and "Look up my match" can pick up the wrong match                       |
+| 7   | Medium   | Invite                  | Invitation polling never stops once the invitation is cancelled or expires                    |
+| 8   | Medium   | Invite                  | Typing credentials fires a request on every keystroke and disables the form mid-typing        |
+| 9   | Medium   | Play                    | Editing the student ID one character at a time deletes the stored game token                  |
+| 10  | Medium   | Play                    | 409 handling depends on error codes and message text the server doesn't send                  |
+| 11  | Medium   | Network                 | No request timeouts, so a hung request locks the play controls                                |
+| 12  | Medium   | Play                    | A move made while another request is in flight is silently dropped                            |
+| 13  | Medium   | History                 | Offset paging over a newest-first list gives duplicates and React key collisions              |
+| 14  | Medium   | Clocks                  | Clock estimates use the client's wall clock, so clock skew shows wrong times                  |
+| 15  | Low      | Engine                  | SAN, insufficient-material and repetition gaps                                                |
+| 16  | Low      | UX / copy               | Development-process text shown in the UI, wrong labels, inconsistent token handling           |
+| 17  | Low      | Maintainability         | Duplicated helpers, a storage key written in three places, dead code, stale lint suppressions |
+| 18  | Low      | Project hygiene         | Template README, placeholder package name, no tests, no env docs, `NOTES.md` inconsistencies  |
 
 ---
 
@@ -63,17 +63,17 @@ verification has to land on the server before release. No client-side fix can cl
 **Where:** `src/net/api.ts` (`watchMatch`, `watchInvitation`, `pollMatch`);
 `src/components/PlayRoom.tsx:272`, `WatchRoom.tsx:133`, `InviteLobby.tsx:133`.
 
-The spec says: *"…then terminal `game_over` or `aborted` and the server closes the
-stream."* When the server closes a stream, `EventSource` fires `error` and reconnects
+The spec says: _"…then terminal `game_over` or `aborted` and the server closes the
+stream."_ When the server closes a stream, `EventSource` fires `error` and reconnects
 automatically. None of the terminal handlers call `es.close()`. As a result:
 
-1. `onError` runs, and the screen shows *"Live stream interrupted — polling…"* on a game
+1. `onError` runs, and the screen shows _"Live stream interrupted — polling…"_ on a game
    that ended normally.
 2. `startPolling()` starts `pollMatch`, which then runs every 3 s indefinitely. Each tick
    sends `GET ongoing/{id}` (404) followed by `GET completed/{id}`, so every open tab makes
    2 requests per 3 s for as long as it stays open.
 3. `EventSource` keeps reconnecting too. The spec says that reconnecting to an ended match
-   *replays its final event and closes*, so the tab loops through reconnect, `game_over`,
+   _replays its final event and closes_, so the tab loops through reconnect, `game_over`,
    close, error, reconnect indefinitely.
 
 The effect in `PlayRoom`/`WatchRoom` only cleans up on unmount or when `matchId`/token
@@ -89,7 +89,7 @@ has arrived.
 **Where:** `PlayRoom.tsx:211, 266, 355`, `WatchRoom.tsx:67, 127`
 
 ```ts
-setPhase((prev) => ({ kind: "over", completed, view: prev.kind === "live" ? prev.view : null }));
+setPhase((prev) => ({ kind: 'over', completed, view: prev.kind === 'live' ? prev.view : null }));
 ```
 
 This keeps the board only when the previous phase was `live`. A second terminal
@@ -111,9 +111,9 @@ ignore terminal events once the phase is already `over`.
 
 - `ChessBoard` always renders White at the bottom. It has no orientation prop, so the
   Black player has their own pieces at the top.
-- `PlayRoom`'s sidebar always shows Black on top as *"Opponent · Black"* and White at the
-  bottom as *"You · White"*. The Black player sees their opponent labelled "You".
-- `WatchRoom.tsx:199` labels Black as *"Opponent"* on the spectator view, where neither
+- `PlayRoom`'s sidebar always shows Black on top as _"Opponent · Black"_ and White at the
+  bottom as _"You · White"_. The Black player sees their opponent labelled "You".
+- `WatchRoom.tsx:199` labels Black as _"Opponent"_ on the spectator view, where neither
   player is the viewer.
 
 **Fix:** add an `orientation`/`flipped` prop to `ChessBoard` that reverses rows, columns
@@ -125,7 +125,7 @@ and coordinates, and choose the sidebar's top/bottom and "You/Opponent" tags fro
 
 An aborted match is deleted, so `GET ongoing/{id}` returns 404 and `GET completed/{id}`
 also returns 404. `pollMatch` treats this as `onError` and never calls `onAborted`. In
-`PlayRoom` the user sees *"Server unreachable — retrying every few seconds…"* forever. In
+`PlayRoom` the user sees _"Server unreachable — retrying every few seconds…"_ forever. In
 `WatchRoom` the last live board stays on screen.
 
 **Fix:** if the match was seen ongoing before and both GETs now return 404, report
@@ -148,8 +148,8 @@ taken when the invitation was issued.
 
 **Where:** `api.ts:649` comment vs `InviteLobby.tsx`
 
-The comment says *"explicit cancel/expire still arrives via `GET /invitations/me` checks
-in the caller"*, but the caller makes no such checks. Once the stream has failed, a
+The comment says _"explicit cancel/expire still arrives via `GET /invitations/me` checks
+in the caller"_, but the caller makes no such checks. Once the stream has failed, a
 cancelled or expired invitation keeps the lobby polling every 4 s indefinitely and
 showing "Waiting for your friend…". A 404 on the invitation stream also makes
 `EventSource` retry that URL indefinitely, because nothing closes it.
@@ -235,7 +235,7 @@ need server support).
 clock. A client whose clock is 20 s fast shows 20 s less on the side to move and triggers
 the "clock hit zero" nudge early. A slow clock shows more time than the player has.
 
-**Fix:** measure elapsed time from when each snapshot was *received* (`performance.now()`
+**Fix:** measure elapsed time from when each snapshot was _received_ (`performance.now()`
 at receipt), or estimate the offset from the response `Date` header.
 
 ## 15. Low: engine gaps (`src/chess/engine.ts`)
@@ -257,14 +257,14 @@ The server is authoritative, so these only affect local play and the display.
 
 ## 16. Low: UX and copy
 
-- Development-process labels appear in the product UI, for example *"Backend match ·
-  steps 3–4"* (`PlayRoom`), *"Backend lobby · step 2"* (`InviteLobby`/`JoinRoom`),
-  *"Backend history · optional"* and *"Start now (test mode)"*.
+- Development-process labels appear in the product UI, for example _"Backend match ·
+  steps 3–4"_ (`PlayRoom`), _"Backend lobby · step 2"_ (`InviteLobby`/`JoinRoom`),
+  _"Backend history · optional"_ and _"Start now (test mode)"_.
 - The game token is handled inconsistently. `JoinRoom` hides it behind "Reveal" and says
-  *"never logged"*. `InviteLobby` prints it in plain text and says *"shown once, step 3
-  will use it"*. The token doesn't need to be shown at all, because it's already saved
+  _"never logged"_. `InviteLobby` prints it in plain text and says _"shown once, step 3
+  will use it"_. The token doesn't need to be shown at all, because it's already saved
   for the play view.
-- `JoinRoom` says *"shown once — copy it now, it dies with the match"*, but `PlayRoom`
+- `JoinRoom` says _"shown once — copy it now, it dies with the match"_, but `PlayRoom`
   can re-issue it at any time.
 - Result labels show raw student IDs (`CS0103125 wins · checkmate`) rather than names.
 - `HistoryRoom` shows a "Play" link on every ongoing row, including other students'
@@ -277,8 +277,8 @@ The server is authoritative, so these only affect local play and the display.
 - `src/data/students.ts` is a hard-coded sample directory with real-looking names bound to
   real-format IDs. The "Narek Sargsyan" entry has a `CS` ID with faculty "Business" and
   group `BS-21A`. A real student with one of these IDs would be shown as someone else.
-- The `LocalRoom` welcome sentence is grammatically broken, for example *"Welcome to ACT
-  Chess, White you are now playing with Black"*.
+- The `LocalRoom` welcome sentence is grammatically broken, for example _"Welcome to ACT
+  Chess, White you are now playing with Black"_.
 - `IdentityFields` uses inline styles because `App.css` has no input styles. The
   hard-coded colours and font bypass `design-system.md`.
 

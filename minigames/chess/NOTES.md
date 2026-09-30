@@ -49,8 +49,7 @@ Running log of what's been done, in order. For my own reference across sessions.
 ## 4. Integration step 2 — invitation lobby (implemented)
 
 - `src/net/api.ts` (extended): player-credential slice — `PlayerIdentity`,
-  authed `apiPost` (no `Content-Type` on bodyless POSTs — strict bodies, avoid
-  415) + `apiGetAuthed`, `throwForStatus`, types `IssuedInvitation` /
+  authed `apiPost` (no `Content-Type` on bodyless POSTs — strict bodies, avoid 415) + `apiGetAuthed`, `throwForStatus`, types `IssuedInvitation` /
   `InvitationInfo` / `GameSession` / `StartedMatch`, `issueInvitation()`,
   `acceptInvitation()`, `getMyInvitation()`, `cancelMyInvitation()` (204),
   `issueGameSession()` (inviter's token path), `watchInvitation()`
@@ -71,8 +70,8 @@ Running log of what's been done, in order. For my own reference across sessions.
   Accepted → link to `?watch=<match_id>` (board play is steps 3–4).
 - `src/components/JoinRoom.tsx` (new): `?join=<token>` — accept once
   (`POST /invitations/accept` → `{ongoing, session}`), shows match + own side
-  + game token behind reveal-once UI (never logged/stored long-term), friendly
-  404 (used/expired) / 409 (own invitation) errors, link to `?watch=`.
+  - game token behind reveal-once UI (never logged/stored long-term), friendly
+    404 (used/expired) / 409 (own invitation) errors, link to `?watch=`.
 - `src/App.tsx`: `invite` / `join` routes (checked before `?game=`
   persistence, which now also skips them); existing local/online/watch play
   untouched (additive routes only).
@@ -223,19 +222,19 @@ Running log of what's been done, in order. For my own reference across sessions.
 ## 9. Remaining work to fully integrate backend (open, 2026-09-18)
 
 - [x] 2. Small spec-polish items — done, see §10 (history "load more"
-  paging, `503` → GET-polling fallback in match + invitation streams,
-  flag-fall claim nudge).
+      paging, `503` → GET-polling fallback in match + invitation streams,
+      flag-fall claim nudge).
 - [ ] 1. Live end-to-end proof (the one real gap — §5 never probed a move
-  round-trip; still open 2026-09-18 — server up but both lists empty, needs
-  two real student IDs in two browsers). With two real student IDs: `?invite` → `?join=<token>` →
-  both open `?play=<match_id>`; play moves (incl. `ply` staleness / 409
-  resync), checkmate/stalemate auto-draw, resign (two-click), timeout claim
-  (409-while-time-remains), abort-before-both-moved (deleted, in neither
-  list); then `?watch=<match_id>` replay + `?history=<student_id>` showing
-  `settlement_state` (`pending`/`delivered`/`dead`/`voided`/`null`).
+      round-trip; still open 2026-09-18 — server up but both lists empty, needs
+      two real student IDs in two browsers). With two real student IDs: `?invite` → `?join=<token>` →
+      both open `?play=<match_id>`; play moves (incl. `ply` staleness / 409
+      resync), checkmate/stalemate auto-draw, resign (two-click), timeout claim
+      (409-while-time-remains), abort-before-both-moved (deleted, in neither
+      list); then `?watch=<match_id>` replay + `?history=<student_id>` showing
+      `settlement_state` (`pending`/`delivered`/`dead`/`voided`/`null`).
 - [ ] 2. ~~Small spec-polish items~~ — done (§10).
 - [ ] 3. Intentionally never build in this client (documented, do not
-  implement). Admin requeue/void (`POST completed/{id}/requeue`|`void` —
-  admin token, separate tool only); draw-offer UI (`agreement` unreachable,
-  no endpoint); leaderboard/rating (lives in sport-tracking
-  `?sport_tag=chess`, separate integration if rankings are wanted).
+      implement). Admin requeue/void (`POST completed/{id}/requeue`|`void` —
+      admin token, separate tool only); draw-offer UI (`agreement` unreachable,
+      no endpoint); leaderboard/rating (lives in sport-tracking
+      `?sport_tag=chess`, separate integration if rankings are wanted).

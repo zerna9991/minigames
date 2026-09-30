@@ -36,13 +36,13 @@ change to adopt the backend.
 
 ### 1.2 Authentication matrix
 
-| Operation | Credentials |
-|---|---|
-| `GET /health`, `GET /api/v1/matches/…` (reads + lists), both SSE streams | Public, none |
-| Invitations (`POST /invitations`, `POST /invitations/accept`, `GET/DELETE /invitations/me`), `POST /matches/ongoing/{id}/session` | Player credentials |
-| Moves, resignations, timeout claims | Player credentials **+ `X-Game-Token`** |
-| `POST /api/v1/matches/completed/{match_id}/void` and `…/requeue` | Static admin token (`ADMIN_TOKEN`), as `Authorization: Bearer <token>` **or** `X-Admin-Token: <token>` (either works; with no `ADMIN_TOKEN` configured they always answer `401`) |
-| `GET /api-docs`, `GET /api-docs/openapi.json` | `Authorization: Bearer <ADMIN_TOKEN>` |
+| Operation                                                                                                                         | Credentials                                                                                                                                                                      |
+| --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /health`, `GET /api/v1/matches/…` (reads + lists), both SSE streams                                                          | Public, none                                                                                                                                                                     |
+| Invitations (`POST /invitations`, `POST /invitations/accept`, `GET/DELETE /invitations/me`), `POST /matches/ongoing/{id}/session` | Player credentials                                                                                                                                                               |
+| Moves, resignations, timeout claims                                                                                               | Player credentials **+ `X-Game-Token`**                                                                                                                                          |
+| `POST /api/v1/matches/completed/{match_id}/void` and `…/requeue`                                                                  | Static admin token (`ADMIN_TOKEN`), as `Authorization: Bearer <token>` **or** `X-Admin-Token: <token>` (either works; with no `ADMIN_TOKEN` configured they always answer `401`) |
+| `GET /api-docs`, `GET /api-docs/openapi.json`                                                                                     | `Authorization: Bearer <ADMIN_TOKEN>`                                                                                                                                            |
 
 Player credentials = **both** headers together:
 
@@ -101,11 +101,11 @@ X-Game-Token: <game-session-token>
 - No body. Returns `201 IssuedInvitation`:
   ```json
   {
-    "token": "q3Jx0cK1vVb8m2Zp9LwY4tR7nE6sH5dA1fG0jU3iO2k",
-    "watch_key": "8pQ2fV0sYkq3mXc7RzB1oN4tJ6hL9dGwA5uE2iT0yS8",
-    "inviter_id": "CS0103125",
-    "created_at": "2026-09-15T16:00:00.000Z",
-    "expires_at": "2026-09-16T16:00:00.000Z"
+  	"token": "q3Jx0cK1vVb8m2Zp9LwY4tR7nE6sH5dA1fG0jU3iO2k",
+  	"watch_key": "8pQ2fV0sYkq3mXc7RzB1oN4tJ6hL9dGwA5uE2iT0yS8",
+  	"inviter_id": "CS0103125",
+  	"created_at": "2026-09-15T16:00:00.000Z",
+  	"expires_at": "2026-09-16T16:00:00.000Z"
   }
   ```
 - `token` (43-char base64url) is returned **only here** — embed it in the
@@ -178,17 +178,17 @@ moment it ends.
 
 `OngoingMatch` fields (all required):
 
-| Field | Meaning |
-|---|---|
-| `match_id` | ULID, shared with sport-tracking |
-| `white_id` / `black_id` | Student IDs (random colours at accept time) |
-| `moves` | UCI strings oldest-first, e.g. `["e2e4","e7e5","g1f3"]`; promotion `e7e8q`; castling as king move `e1g1` |
-| `fen` | Current position in FEN |
-| `turn` | `white` \| `black` |
-| `ply` | `moves.length`; echo back on your next move for staleness guard |
-| `white_clock_ms` / `black_clock_ms` | Remaining ms **as of this response** |
-| `increment_ms` | 5000 (5 s added after each of your moves) |
-| `turn_started_at` / `started_at` | ISO-8601 UTC |
+| Field                               | Meaning                                                                                                  |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `match_id`                          | ULID, shared with sport-tracking                                                                         |
+| `white_id` / `black_id`             | Student IDs (random colours at accept time)                                                              |
+| `moves`                             | UCI strings oldest-first, e.g. `["e2e4","e7e5","g1f3"]`; promotion `e7e8q`; castling as king move `e1g1` |
+| `fen`                               | Current position in FEN                                                                                  |
+| `turn`                              | `white` \| `black`                                                                                       |
+| `ply`                               | `moves.length`; echo back on your next move for staleness guard                                          |
+| `white_clock_ms` / `black_clock_ms` | Remaining ms **as of this response**                                                                     |
+| `increment_ms`                      | 5000 (5 s added after each of your moves)                                                                |
+| `turn_started_at` / `started_at`    | ISO-8601 UTC                                                                                             |
 
 #### Matches — writes (player credentials; moves/resign/timeout also need `X-Game-Token`)
 
@@ -246,7 +246,7 @@ call it. `409` while time remains; `aborted` before both sides moved.
 fresh retry count; the delivery worker resends the points stored when the match
 ended (never recomputed). Returns the match. `409` when the match earned no
 points, or is already `pending`/`delivered`. Tip from the spec: a match that
-went `dead` because sport-tracking already holds a *different* settlement for
+went `dead` because sport-tracking already holds a _different_ settlement for
 it must be voided first — requeueing alone would only die again.
 Responses: `200,400,401,404,409,500`.
 
@@ -280,7 +280,7 @@ connection is configured. Responses: `200,400,401,404,409,500,502,503`.
   itself (count down locally between events; clocks are as of each event).
 - Note the read asymmetry: `GET …/ongoing/{match_id}` returns `404` once the
   match has ended — look it up under `/completed` instead (aborted matches are
-  gone entirely), while the *stream* replays the final event.
+  gone entirely), while the _stream_ replays the final event.
 
 Example frame:
 
@@ -328,53 +328,55 @@ derived from settled points.
 ### 1.7 TypeScript fetch sketches
 
 ```ts
-const API = "https://act.gormadatyan.xyz/chess";
+const API = 'https://act.gormadatyan.xyz/chess';
 const playerHeaders = (session: string, studentId: string) => ({
-  "Authorization": `Bearer ${session}`,
-  "X-Student-Id": studentId,
-  "Content-Type": "application/json",
+	Authorization: `Bearer ${session}`,
+	'X-Student-Id': studentId,
+	'Content-Type': 'application/json'
 });
 
 // Issue invitation (inviter)
 const res = await fetch(`${API}/api/v1/invitations`, {
-  method: "POST", headers: playerHeaders(session, studentId),
+	method: 'POST',
+	headers: playerHeaders(session, studentId)
 });
 const issued = await res.json(); // { token, watch_key, ... }
 const link = `${location.origin}/chess/join?token=${issued.token}`;
 
 // Watch invitation (EventSource needs no headers — key is the capability)
-const es = new EventSource(
-  `${API}/api/v1/invitations/watch/${issued.watch_key}/events`);
-es.addEventListener("accepted", async (e) => {
-  const { match_id } = JSON.parse((e as MessageEvent).data);
-  const s = await fetch(`${API}/api/v1/matches/ongoing/${match_id}/session`,
-    { method: "POST", headers: playerHeaders(session, studentId) });
-  const gameSession = await s.json(); // { token, side, ... } — store, show once
-  watchMatch(match_id);
+const es = new EventSource(`${API}/api/v1/invitations/watch/${issued.watch_key}/events`);
+es.addEventListener('accepted', async (e) => {
+	const { match_id } = JSON.parse((e as MessageEvent).data);
+	const s = await fetch(`${API}/api/v1/matches/ongoing/${match_id}/session`, {
+		method: 'POST',
+		headers: playerHeaders(session, studentId)
+	});
+	const gameSession = await s.json(); // { token, side, ... } — store, show once
+	watchMatch(match_id);
 });
 
 // Accept (friend, from link token)
 const acc = await fetch(`${API}/api/v1/invitations/accept`, {
-  method: "POST",
-  headers: playerHeaders(session, friendId),
-  body: JSON.stringify({ token }),
+	method: 'POST',
+	headers: playerHeaders(session, friendId),
+	body: JSON.stringify({ token })
 });
 const { ongoing, session } = await acc.json(); // open board now
 
 // Play (always send ply + game token)
 await fetch(`${API}/api/v1/matches/ongoing/${match_id}/moves`, {
-  method: "POST",
-  headers: { ...playerHeaders(session, studentId), "X-Game-Token": gameToken },
-  body: JSON.stringify({ uci: "e2e4", ply: ongoing.ply }),
+	method: 'POST',
+	headers: { ...playerHeaders(session, studentId), 'X-Game-Token': gameToken },
+	body: JSON.stringify({ uci: 'e2e4', ply: ongoing.ply })
 });
 
 // Watch match
 function watchMatch(match_id: string) {
-  const mes = new EventSource(`${API}/api/v1/matches/ongoing/${match_id}/events`);
-  mes.addEventListener("snapshot", applyFullState);
-  mes.addEventListener("move", applyFullState);
-  mes.addEventListener("game_over", closeWithResult);
-  mes.addEventListener("aborted", closeAsAborted);
+	const mes = new EventSource(`${API}/api/v1/matches/ongoing/${match_id}/events`);
+	mes.addEventListener('snapshot', applyFullState);
+	mes.addEventListener('move', applyFullState);
+	mes.addEventListener('game_over', closeWithResult);
+	mes.addEventListener('aborted', closeAsAborted);
 }
 ```
 
@@ -382,20 +384,20 @@ function watchMatch(match_id: string) {
 
 Every error is `{ "error": "<code>", "message": "diagnostics…" }`:
 
-| HTTP | `error` | Typical cause |
-|---|---|---|
-| 400 | `bad_request` | Malformed student/match ID, non-UCI or illegal move, wrong-typed query, non-JSON body |
-| 401 | `unauthorized` | Missing session token / missing-or-malformed `X-Student-Id`; missing or wrong admin token (docs, void, requeue); always `401` when no `ADMIN_TOKEN` is configured |
-| 403 | `forbidden` | Not a player in this match; missing/wrong/replaced `X-Game-Token`; student unknown to portal |
-| 404 | `not_found` | Unknown match; no open invitation; unknown/expired invitation token; unknown route |
-| 405 | `method_not_allowed` | Known path, wrong method (`Allow` lists valid ones) |
-| 409 | `conflict` | Not your turn; stale `ply`; match already completed; accepting own invitation; timeout claimed with time remaining; voiding/requeueing a match that earned no points; requeueing one already `pending`/`delivered` |
-| 413 | `payload_too_large` | Body > 2 MB |
-| 415 | `unsupported_media_type` | JSON body without `Content-Type: application/json` |
-| 422 | `unprocessable_entity` | Valid JSON failing schema (missing/unknown/mistyped field — bodies are strict) |
-| 500 | `internal_error` | DB / I/O failure |
-| 502 | `bad_gateway` | Student portal unreachable (invitations only; games never call portal) **or** sport-tracking unreachable/refusing on admin void |
-| 503 | `service_unavailable` | Stream refused — >200 watchers on that match/invitation |
+| HTTP | `error`                  | Typical cause                                                                                                                                                                                                      |
+| ---- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 400  | `bad_request`            | Malformed student/match ID, non-UCI or illegal move, wrong-typed query, non-JSON body                                                                                                                              |
+| 401  | `unauthorized`           | Missing session token / missing-or-malformed `X-Student-Id`; missing or wrong admin token (docs, void, requeue); always `401` when no `ADMIN_TOKEN` is configured                                                  |
+| 403  | `forbidden`              | Not a player in this match; missing/wrong/replaced `X-Game-Token`; student unknown to portal                                                                                                                       |
+| 404  | `not_found`              | Unknown match; no open invitation; unknown/expired invitation token; unknown route                                                                                                                                 |
+| 405  | `method_not_allowed`     | Known path, wrong method (`Allow` lists valid ones)                                                                                                                                                                |
+| 409  | `conflict`               | Not your turn; stale `ply`; match already completed; accepting own invitation; timeout claimed with time remaining; voiding/requeueing a match that earned no points; requeueing one already `pending`/`delivered` |
+| 413  | `payload_too_large`      | Body > 2 MB                                                                                                                                                                                                        |
+| 415  | `unsupported_media_type` | JSON body without `Content-Type: application/json`                                                                                                                                                                 |
+| 422  | `unprocessable_entity`   | Valid JSON failing schema (missing/unknown/mistyped field — bodies are strict)                                                                                                                                     |
+| 500  | `internal_error`         | DB / I/O failure                                                                                                                                                                                                   |
+| 502  | `bad_gateway`            | Student portal unreachable (invitations only; games never call portal) **or** sport-tracking unreachable/refusing on admin void                                                                                    |
+| 503  | `service_unavailable`    | Stream refused — >200 watchers on that match/invitation                                                                                                                                                            |
 
 ---
 
@@ -403,15 +405,15 @@ Every error is `{ "error": "<code>", "message": "diagnostics…" }`:
 
 ### 2.1 Frontend architecture today (all local, zero backend calls)
 
-| File | Role |
-|---|---|
-| `src/App.tsx` | Routing + rooms. `OnlineRoom` (2 tabs handshake) and `LocalRoom` (same-screen). Query params: `?game=XXXXXX`, `?you=Name`, `?local=1&white=&black=`, plus uncommitted test mode `?solo=1`/`?test=1` (play both sides on one screen, bypasses lobby). `makeGameId()` = 6-char base36, `tabName()` via `sessionStorage`. `RoomShell` = topbar + sidebar + board + modal. |
-| `src/net/useSyncedGame.ts` | **Replaces the entire backend today.** `BroadcastChannel('act-chess-'+gameId)` + `localStorage` seat claims (`act-chess-{gameId}-seats`, 120 s staleness) for White/Black assignment, `hello/bye/ready/move/sync-request/sync-state` messages, 1.5 s hello loop, 6 s peer pruning, `pressReady/doMove`. Same-browser-tabs only. |
-| `src/chess/engine.ts` | **Replaces server authority today.** Full client rules: pseudo+legal move gen, castling, en passant, promotion, check/checkmate/stalemate, fifty-move (halfmove ≥ 100), insufficient material (K vs K, K+minor vs K), SAN (`moveToSan`). Note: no threefold repetition, no clocks. |
-| `src/components/ChessBoard.tsx` | Board grid, selection/targets, promotion modal, last-move + check highlight, move list (SAN pairs with piece glyphs), move/capture fly animation (340 ms, honors `prefers-reduced-motion`), `locked` overlay, `myColor: 'w'|'b'|'both'|null` gating (`canMoveNow`). Consumes `Move {fromR,fromC,toR,toC,promotion?,isCastle?,isEnPassant?}` — **not UCI**. `HistoryEntry` now also carries `piece` (the moved piece, for glyphs/animation). |
-| `src/components/ProfileSidebar.tsx` | Opponent/You cards (name, faculty, group, photo/initials avatar, color, Ready ✓, turn ring). |
-| `src/data/students.ts` | **Replaces the student portal today.** 3-entry static `DIRECTORY` + `resolveStudent()` with graceful fallback (`—` fields). No IDs in flow; names are free text. |
-| `src/main.tsx`, `index.css`, `App.css`, `design-system.md` | Bootstrap, styling, portal design tokens. No networking config; `vite.config.ts` is stock; no API base URL, no proxy, no env. |
+| File                                                       | Role                                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/App.tsx`                                              | Routing + rooms. `OnlineRoom` (2 tabs handshake) and `LocalRoom` (same-screen). Query params: `?game=XXXXXX`, `?you=Name`, `?local=1&white=&black=`, plus uncommitted test mode `?solo=1`/`?test=1` (play both sides on one screen, bypasses lobby). `makeGameId()` = 6-char base36, `tabName()` via `sessionStorage`. `RoomShell` = topbar + sidebar + board + modal. |
+| `src/net/useSyncedGame.ts`                                 | **Replaces the entire backend today.** `BroadcastChannel('act-chess-'+gameId)` + `localStorage` seat claims (`act-chess-{gameId}-seats`, 120 s staleness) for White/Black assignment, `hello/bye/ready/move/sync-request/sync-state` messages, 1.5 s hello loop, 6 s peer pruning, `pressReady/doMove`. Same-browser-tabs only.                                        |
+| `src/chess/engine.ts`                                      | **Replaces server authority today.** Full client rules: pseudo+legal move gen, castling, en passant, promotion, check/checkmate/stalemate, fifty-move (halfmove ≥ 100), insufficient material (K vs K, K+minor vs K), SAN (`moveToSan`). Note: no threefold repetition, no clocks.                                                                                     |
+| `src/components/ChessBoard.tsx`                            | Board grid, selection/targets, promotion modal, last-move + check highlight, move list (SAN pairs with piece glyphs), move/capture fly animation (340 ms, honors `prefers-reduced-motion`), `locked` overlay, `myColor: 'w'                                                                                                                                            | 'b' | 'both' | null` gating (`canMoveNow`). Consumes `Move {fromR,fromC,toR,toC,promotion?,isCastle?,isEnPassant?}`— **not UCI**.`HistoryEntry`now also carries`piece` (the moved piece, for glyphs/animation). |
+| `src/components/ProfileSidebar.tsx`                        | Opponent/You cards (name, faculty, group, photo/initials avatar, color, Ready ✓, turn ring).                                                                                                                                                                                                                                                                           |
+| `src/data/students.ts`                                     | **Replaces the student portal today.** 3-entry static `DIRECTORY` + `resolveStudent()` with graceful fallback (`—` fields). No IDs in flow; names are free text.                                                                                                                                                                                                       |
+| `src/main.tsx`, `index.css`, `App.css`, `design-system.md` | Bootstrap, styling, portal design tokens. No networking config; `vite.config.ts` is stock; no API base URL, no proxy, no env.                                                                                                                                                                                                                                          |
 
 Verified: **no `fetch`, no `EventSource`, no `Authorization`/`X-Student-Id`/
 `X-Game-Token` headers, no ULID/`watch_key`/FEN/UCI handling anywhere in
@@ -419,21 +421,21 @@ Verified: **no `fetch`, no `EventSource`, no `Authorization`/`X-Student-Id`/
 
 ### 2.2 Concept-by-concept mapping
 
-| API concept | Frontend today | Match? | What integration requires |
-|---|---|---|---|
-| Match (`match_id` ULID, `OngoingMatch`) | `gameId` 6-char code + local `GameState` | ❌ different ID + local state | Use server `match_id` from accept/session flow as the room key; render from server `fen`/`moves`/`turn`, not local engine as source of truth. Keep `engine.ts` only for move highlighting / preview. |
-| Invitation link (`token` + `watch_key`, 24 h, single-use, one-open-per-student) | Shareable URL `?game=XXXXXX` (reusable, never expires, unlimited rooms) | ❌ shape differs | New waiting screen: `POST /invitations` → link `…/join?token=…`; inviter watches `…/watch/{watch_key}/events`; `GET /invitations/me` to resume; `DELETE` to cancel. Handle `replaced/cancelled/expired` + `404→check ongoing list`. |
-| Accept → random colours + `StartedMatch{ongoing, session}` | `localStorage` seat claim (first tab White, second Black; stale 120 s; spectators if full) + manual OK modal | ❌ | Delete seat-claim path for online play: colours come from server (`GameSession.side` + `white_id/black_id`). Keep the OK modal only as UX, not as authority. |
-| Auth (portal session + `X-Student-Id`; game token per match) | Free-text display names (`?you=`, `tabName()`); no IDs, no tokens | ❌ | Add login/identity (portal session + student ID `CS/EM/DA+7`), persist game token per match (memory/session, never localStorage long-term — it's shown once; re-issue replaces). Send the 2 (or 3) headers on every authed call. |
-| Player directory (portal; names/photos) | Static 3-person `DIRECTORY` | ⚠️ placeholder | Replace/augment `resolveStudent` with portal lookup; keep fallback avatar for unknown names. |
-| Moves (UCI `e2e4/e7e8q/e1g1`, server-validated, `ply` guard) | `Move` objects over `BroadcastChannel`, client-applied, no validation handshake | ❌ wire format differs | Add `Move ↔ UCI` codec (needs promotion piece + castling-as-king-move mapping; engine squares ↔ `a1–h8`). Always send `{uci, ply}`; on `409` stale-`ply`/not-your-turn, re-sync from `GET` match or last SSE snapshot. |
-| Board truth (server FEN + full `moves[]`) | Local `GameState{board,turn,castling,enPassant,halfmove,fullmove}` + `HistoryEntry{san,move,captured}` | ⚠️ convertible | Apply SSE `snapshot/move` full states (FEN→board or replay UCI list through engine for display); derive SAN locally via `moveToSan` for the move list. Server is truth; local engine is view/assist. |
-| Clocks (10 min + 5 s/move, `white_clock_ms/black_clock_ms`, `turn_started_at`, timeout claims) | None — no timers at all | ❌ missing UI + logic | New clock display (count down from last server timestamps + `increment_ms`); client clock is estimate only. Add claim-timeout button (`POST …/timeout`, `409` = too early) and handle flag-fall-on-move endings. Note: no SSE event for expiry — must poll/claim. |
-| Endings (server: checkmate/stalemate/repetition/fifty-move/insufficient + `resign`/`timeout`; `game_over/aborted` events; `CompletedMatch` + `settlement_state`) | Client `getGameResult` (checkmate/stalemate/fifty-move/insufficient only — **no repetition detection**) + no resign/timeout/abort | ⚠️ partial | Add Resign + Claim-timeout buttons; handle `game_over` (show `result/termination/winner_id`, points note v2: win +3 / loss −2 / draw 0) and `aborted` (room deleted, no result). Add repetition detection locally only if needed for preview — server decides. |
-| Live updates (SSE `snapshot/move/game_over/aborted`, `id: ply`, keep-alive 15 s, 200 watchers, `Last-Event-ID` ignored) | `BroadcastChannel` messages + full-state `sync-state` adoption if sender ahead | ❌ transport differs | Replace transport in `useSyncedGame` (or add `useServerGame`): `EventSource` for match stream + `POST` moves. Same "full-state wins" mental model already exists — easy port. Handle `503` → fallback to `GET` polling; reconnect → fresh snapshot. |
-| Lists (`GET ongoing/completed?student_id&limit&offset`, bare arrays) | None — no history, no match lookup | ❌ | New "My games / History" screens; page until `< limit`. Useful also for the `invitation-404 → find started match` recovery path. |
-| Errors (`ErrorBody`, strict bodies, 400/401/403/404/409/413/415/422/500/502/503) | Silent `try/catch` ignores (illegal remote move → `sync-request`) | ❌ | Surface toasts/errors per code: `409` = refresh + "not your turn/stale"; `403` = re-issue game token or wrong identity; `404` = invitation consumed/expired; `503` = polling fallback; `502` = portal down (invites only). |
-| Health | None | ❌ | Optional status dot via `GET /health`. |
+| API concept                                                                                                                                                      | Frontend today                                                                                                                    | Match?                        | What integration requires                                                                                                                                                                                                                                         |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Match (`match_id` ULID, `OngoingMatch`)                                                                                                                          | `gameId` 6-char code + local `GameState`                                                                                          | ❌ different ID + local state | Use server `match_id` from accept/session flow as the room key; render from server `fen`/`moves`/`turn`, not local engine as source of truth. Keep `engine.ts` only for move highlighting / preview.                                                              |
+| Invitation link (`token` + `watch_key`, 24 h, single-use, one-open-per-student)                                                                                  | Shareable URL `?game=XXXXXX` (reusable, never expires, unlimited rooms)                                                           | ❌ shape differs              | New waiting screen: `POST /invitations` → link `…/join?token=…`; inviter watches `…/watch/{watch_key}/events`; `GET /invitations/me` to resume; `DELETE` to cancel. Handle `replaced/cancelled/expired` + `404→check ongoing list`.                               |
+| Accept → random colours + `StartedMatch{ongoing, session}`                                                                                                       | `localStorage` seat claim (first tab White, second Black; stale 120 s; spectators if full) + manual OK modal                      | ❌                            | Delete seat-claim path for online play: colours come from server (`GameSession.side` + `white_id/black_id`). Keep the OK modal only as UX, not as authority.                                                                                                      |
+| Auth (portal session + `X-Student-Id`; game token per match)                                                                                                     | Free-text display names (`?you=`, `tabName()`); no IDs, no tokens                                                                 | ❌                            | Add login/identity (portal session + student ID `CS/EM/DA+7`), persist game token per match (memory/session, never localStorage long-term — it's shown once; re-issue replaces). Send the 2 (or 3) headers on every authed call.                                  |
+| Player directory (portal; names/photos)                                                                                                                          | Static 3-person `DIRECTORY`                                                                                                       | ⚠️ placeholder                | Replace/augment `resolveStudent` with portal lookup; keep fallback avatar for unknown names.                                                                                                                                                                      |
+| Moves (UCI `e2e4/e7e8q/e1g1`, server-validated, `ply` guard)                                                                                                     | `Move` objects over `BroadcastChannel`, client-applied, no validation handshake                                                   | ❌ wire format differs        | Add `Move ↔ UCI` codec (needs promotion piece + castling-as-king-move mapping; engine squares ↔ `a1–h8`). Always send `{uci, ply}`; on `409` stale-`ply`/not-your-turn, re-sync from `GET` match or last SSE snapshot.                                            |
+| Board truth (server FEN + full `moves[]`)                                                                                                                        | Local `GameState{board,turn,castling,enPassant,halfmove,fullmove}` + `HistoryEntry{san,move,captured}`                            | ⚠️ convertible                | Apply SSE `snapshot/move` full states (FEN→board or replay UCI list through engine for display); derive SAN locally via `moveToSan` for the move list. Server is truth; local engine is view/assist.                                                              |
+| Clocks (10 min + 5 s/move, `white_clock_ms/black_clock_ms`, `turn_started_at`, timeout claims)                                                                   | None — no timers at all                                                                                                           | ❌ missing UI + logic         | New clock display (count down from last server timestamps + `increment_ms`); client clock is estimate only. Add claim-timeout button (`POST …/timeout`, `409` = too early) and handle flag-fall-on-move endings. Note: no SSE event for expiry — must poll/claim. |
+| Endings (server: checkmate/stalemate/repetition/fifty-move/insufficient + `resign`/`timeout`; `game_over/aborted` events; `CompletedMatch` + `settlement_state`) | Client `getGameResult` (checkmate/stalemate/fifty-move/insufficient only — **no repetition detection**) + no resign/timeout/abort | ⚠️ partial                    | Add Resign + Claim-timeout buttons; handle `game_over` (show `result/termination/winner_id`, points note v2: win +3 / loss −2 / draw 0) and `aborted` (room deleted, no result). Add repetition detection locally only if needed for preview — server decides.    |
+| Live updates (SSE `snapshot/move/game_over/aborted`, `id: ply`, keep-alive 15 s, 200 watchers, `Last-Event-ID` ignored)                                          | `BroadcastChannel` messages + full-state `sync-state` adoption if sender ahead                                                    | ❌ transport differs          | Replace transport in `useSyncedGame` (or add `useServerGame`): `EventSource` for match stream + `POST` moves. Same "full-state wins" mental model already exists — easy port. Handle `503` → fallback to `GET` polling; reconnect → fresh snapshot.               |
+| Lists (`GET ongoing/completed?student_id&limit&offset`, bare arrays)                                                                                             | None — no history, no match lookup                                                                                                | ❌                            | New "My games / History" screens; page until `< limit`. Useful also for the `invitation-404 → find started match` recovery path.                                                                                                                                  |
+| Errors (`ErrorBody`, strict bodies, 400/401/403/404/409/413/415/422/500/502/503)                                                                                 | Silent `try/catch` ignores (illegal remote move → `sync-request`)                                                                 | ❌                            | Surface toasts/errors per code: `409` = refresh + "not your turn/stale"; `403` = re-issue game token or wrong identity; `404` = invitation consumed/expired; `503` = polling fallback; `502` = portal down (invites only).                                        |
+| Health                                                                                                                                                           | None                                                                                                                              | ❌                            | Optional status dot via `GET /health`.                                                                                                                                                                                                                            |
 
 ### 2.3 Biggest gaps (ordered by integration impact)
 
@@ -484,7 +486,7 @@ Verified: **no `fetch`, no `EventSource`, no `Authorization`/`X-Student-Id`/
 - [ ] `GET /api/v1/matches/ongoing[?student_id&limit&offset]`
 - [ ] `GET /api/v1/matches/ongoing/{match_id}`
 - [ ] `GET /api/v1/matches/ongoing/{match_id}/events` → `snapshot, move*,
-      game_over|aborted`
+    game_over|aborted`
 - [ ] `POST /api/v1/matches/ongoing/{match_id}/session` (inviter's game token)
 - [ ] `POST /api/v1/matches/ongoing/{match_id}/moves {uci, ply?}`
 - [ ] `POST /api/v1/matches/ongoing/{match_id}/resign`

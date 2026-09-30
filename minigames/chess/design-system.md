@@ -25,35 +25,44 @@ Structural architecture:
 Root definition (verbatim from `:root` in `index-DClF6Ipp.css`):
 
 ```css
-:root{
-  --white:#ffffff; --dark:#272727; --white-o:#ffffffb8;
-  --black:#000000; --green:#acfa00; --dark-green:#72a800;
-  --green-o:#abfa004d; --dark-gray:#373737; --gray:#d9d9d9;
-  --red:#f90124; --orange:#fecb00; --blue:#3ec6fd; --gray-o:#00000033;
+:root {
+	--white: #ffffff;
+	--dark: #272727;
+	--white-o: #ffffffb8;
+	--black: #000000;
+	--green: #acfa00;
+	--dark-green: #72a800;
+	--green-o: #abfa004d;
+	--dark-gray: #373737;
+	--gray: #d9d9d9;
+	--red: #f90124;
+	--orange: #fecb00;
+	--blue: #3ec6fd;
+	--gray-o: #00000033;
 }
 ```
 
-| Role | Visual Sample | Hex Code | CSS Variable / Usage |
-| :--- | :--- | :--- | :--- |
-| Primary Accent | [Lime] | `#ACFA00` | `var(--green)` — primary buttons (Join Event, Pay, Submit), active nav text, GPA ring, present-day, toggles ON, badges, links |
-| Primary Hover / Dark Green | [Dark lime] | `#72A800` | `var(--dark-green)` — hover/darker green variant, text on light |
-| Primary Ghost Tint | [Lime 8%] | `#ACFA0014` | hard-coded `rgba(172,250,0,.08)` — active pill bg, file-link hover, pending badge bg |
-| Primary Wash | [Lime 30%] | `#ABFA004D` | `var(--green-o)` — green glow shadow `0 8px 20px var(--green-o)`, modal glows |
-| Secondary / Info Blue | [Sky] | `#3EC6FD` | `var(--blue)` — Telegram CTA `._tg_link`, attendance “attended” ring segment, tournament hover |
-| Background Canvas | [Charcoal] | `#373737` | `var(--dark-gray)` — `.page` background, subject blocks, lists, scroll track |
-| Surface Dark | [Near-black] | `#272727` | `var(--dark)` — sidebar `._menu`, welcome banner, stat cards, event cards, modals, header shadow color |
-| Surface Overlay White 10% | [White 6–10%] | `#FFFFFF0F` / `#FFFFFF1A` | hard-coded — homework rows (`#ffffff0f` → hover `#ffffff1a`), subject rows (`#ffffff1a`) |
-| Border / Muted Gray | [Light gray] | `#D9D9D9` | `var(--gray)` — card borders, input underlines, badge borders, placeholder text |
-| Text Primary | [White] | `#FFFFFF` | `var(--white)` — all headings/body on dark, sidebar profile, table dark-row text |
-| Text Muted | [White 72%] | `#FFFFFFB8` | `var(--white-o)` — welcome subtitle `._welcome_info p`, scrollbar thumb, arrow-circle bg |
-| Text Inverse | [Black] | `#000000` | `var(--black)` — text on lime/blue buttons, present-day text |
-| Transparent Black | [Black 20%] | `#00000033` | `var(--gray-o)` — card shadows `0 4px 10px var(--gray-o)` |
-| Alert / Absent Red | [Red] | `#F90124` | `var(--red)` — absent ring, `to-do` badges (`#f901241a` bg), overdue, validation, calendar absent |
-| Warning / Gold | [Amber] | `#FECB00` | `var(--orange)` — ACT Coin amount, pending badges, calendar? Fallback `#FB923C` used for optional/repair states |
-| Header Glass | [Black 40%] | `#00000066` | `#0006` — sticky mobile header `background-color:#0006` + `backdrop-filter:blur(5px)` |
-| Modal Scrim | [Black 75%] | `#000000BF` | `#000000bf` — inventory modal overlay + `blur(4px)`, `z-index:1000` |
-| Datepicker Blues | [Blue] | `#216BA5` / `#1D5D90` / `#4B7BEC` | bundled `react-datepicker` selected/range states (not brand, do not reuse) |
-| Neutral Fills | [Light] | `#F0F0F0` / `#CCCCCC` / `#AEAEAE` | datepicker in-range, disabled, secondary text |
+| Role                       | Visual Sample | Hex Code                          | CSS Variable / Usage                                                                                                          |
+| :------------------------- | :------------ | :-------------------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
+| Primary Accent             | [Lime]        | `#ACFA00`                         | `var(--green)` — primary buttons (Join Event, Pay, Submit), active nav text, GPA ring, present-day, toggles ON, badges, links |
+| Primary Hover / Dark Green | [Dark lime]   | `#72A800`                         | `var(--dark-green)` — hover/darker green variant, text on light                                                               |
+| Primary Ghost Tint         | [Lime 8%]     | `#ACFA0014`                       | hard-coded `rgba(172,250,0,.08)` — active pill bg, file-link hover, pending badge bg                                          |
+| Primary Wash               | [Lime 30%]    | `#ABFA004D`                       | `var(--green-o)` — green glow shadow `0 8px 20px var(--green-o)`, modal glows                                                 |
+| Secondary / Info Blue      | [Sky]         | `#3EC6FD`                         | `var(--blue)` — Telegram CTA `._tg_link`, attendance “attended” ring segment, tournament hover                                |
+| Background Canvas          | [Charcoal]    | `#373737`                         | `var(--dark-gray)` — `.page` background, subject blocks, lists, scroll track                                                  |
+| Surface Dark               | [Near-black]  | `#272727`                         | `var(--dark)` — sidebar `._menu`, welcome banner, stat cards, event cards, modals, header shadow color                        |
+| Surface Overlay White 10%  | [White 6–10%] | `#FFFFFF0F` / `#FFFFFF1A`         | hard-coded — homework rows (`#ffffff0f` → hover `#ffffff1a`), subject rows (`#ffffff1a`)                                      |
+| Border / Muted Gray        | [Light gray]  | `#D9D9D9`                         | `var(--gray)` — card borders, input underlines, badge borders, placeholder text                                               |
+| Text Primary               | [White]       | `#FFFFFF`                         | `var(--white)` — all headings/body on dark, sidebar profile, table dark-row text                                              |
+| Text Muted                 | [White 72%]   | `#FFFFFFB8`                       | `var(--white-o)` — welcome subtitle `._welcome_info p`, scrollbar thumb, arrow-circle bg                                      |
+| Text Inverse               | [Black]       | `#000000`                         | `var(--black)` — text on lime/blue buttons, present-day text                                                                  |
+| Transparent Black          | [Black 20%]   | `#00000033`                       | `var(--gray-o)` — card shadows `0 4px 10px var(--gray-o)`                                                                     |
+| Alert / Absent Red         | [Red]         | `#F90124`                         | `var(--red)` — absent ring, `to-do` badges (`#f901241a` bg), overdue, validation, calendar absent                             |
+| Warning / Gold             | [Amber]       | `#FECB00`                         | `var(--orange)` — ACT Coin amount, pending badges, calendar? Fallback `#FB923C` used for optional/repair states               |
+| Header Glass               | [Black 40%]   | `#00000066`                       | `#0006` — sticky mobile header `background-color:#0006` + `backdrop-filter:blur(5px)`                                         |
+| Modal Scrim                | [Black 75%]   | `#000000BF`                       | `#000000bf` — inventory modal overlay + `blur(4px)`, `z-index:1000`                                                           |
+| Datepicker Blues           | [Blue]        | `#216BA5` / `#1D5D90` / `#4B7BEC` | bundled `react-datepicker` selected/range states (not brand, do not reuse)                                                    |
+| Neutral Fills              | [Light]       | `#F0F0F0` / `#CCCCCC` / `#AEAEAE` | datepicker in-range, disabled, secondary text                                                                                 |
 
 Opacity scale observed in CSS (for recreating tints): `...0A` (4%), `...14` (8%), `...1A` (10%), `...26` (15%), `...40` (25%), `...4D` (30%), `...59/73` (35–45%), `...B8` (72%).
 
@@ -98,35 +107,85 @@ Opacity scale observed in CSS (for recreating tints): `...0A` (4%), `...14` (8%)
   <button class="_event _payOption">Join Event</button>
   ```
   ```css
-  background:var(--green); color:var(--dark);
-  padding:12px; border:none; border-radius:8px; /* 0px on dashboard carousel, normalize to 8px */
-  font:700 16px/26px Montserrat; text-align:center; cursor:pointer;
-  transition:background-color .3s, opacity .2s;
-  &:disabled{opacity:.5; cursor:not-allowed}
+  background: var(--green);
+  color: var(--dark);
+  padding: 12px;
+  border: none;
+  border-radius: 8px; /* 0px on dashboard carousel, normalize to 8px */
+  font: 700 16px/26px Montserrat;
+  text-align: center;
+  cursor: pointer;
+  transition:
+  	background-color 0.3s,
+  	opacity 0.2s;
+  &:disabled {
+  	opacity: 0.5;
+  	cursor: not-allowed;
+  }
   /* pay variant: border-radius:10px; font-weight:500; flex:1; flex-direction:column; gap:6px */
   ```
   Computed sample: `rgb(172,250,0) / rgb(39,39,39) / 12px / 16px/700`.
 - **Secondary / Dark Button:** `Read More` (`._more`: `background:var(--dark-gray); color:var(--white)` same padding/font as primary, `margin-top:auto` in cards).
 - **Ghost Button:** Filter/toggles (`Past →`, `Main/Extra`, `Upcoming & Ongoing`).
   ```css
-  background:transparent; color:var(--gray); border:1px solid rgba(217,217,217,.25);
-  padding:7px 16px; border-radius:8px; font:500 13px Montserrat;
-  &:hover:not(:disabled){border-color:var(--white); color:var(--white)}
-  &.active{background:#acfa0014; border-color:rgba(172,250,0,.4); color:var(--green); font-weight:600}
+  background: transparent;
+  color: var(--gray);
+  border: 1px solid rgba(217, 217, 217, 0.25);
+  padding: 7px 16px;
+  border-radius: 8px;
+  font: 500 13px Montserrat;
+  &:hover:not(:disabled) {
+  	border-color: var(--white);
+  	color: var(--white);
+  }
+  &.active {
+  	background: #acfa0014;
+  	border-color: rgba(172, 250, 0, 0.4);
+  	color: var(--green);
+  	font-weight: 600;
+  }
   ```
 - **Pill Button:** Homework/subject filters + Kitchen categories (`Food/Drinks/Sauces/Coffee & Tea/Sweets/Salads`).
   ```css
-  display:inline-flex; gap:6px; padding:6px 14px; border-radius:20px;
-  border:1px solid rgba(217,217,217,.2); color:var(--gray); font:500 13px;
-  &.active{border-color:var(--green); background:#acfa001a; color:var(--green); font-weight:700}
-  .badge{width:18px;height:18px;border-radius:50%;background:var(--green);color:var(--dark);font:700 10px}
-  .badge.urgent{background:var(--red);color:#fff}
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(217, 217, 217, 0.2);
+  color: var(--gray);
+  font: 500 13px;
+  &.active {
+  	border-color: var(--green);
+  	background: #acfa001a;
+  	color: var(--green);
+  	font-weight: 700;
+  }
+  .badge {
+  	width: 18px;
+  	height: 18px;
+  	border-radius: 50%;
+  	background: var(--green);
+  	color: var(--dark);
+  	font: 700 10px;
+  }
+  .badge.urgent {
+  	background: var(--red);
+  	color: #fff;
+  }
   ```
 - **Telegram CTA:** Single blue link-button in welcome banner.
   ```css
-  display:inline-flex; gap:7px; background:var(--blue); color:var(--dark);
-  padding:8px 16px; border-radius:8px; font:500 13px; text-decoration:none;
-  &:hover{color:var(--black)}
+  display: inline-flex;
+  gap: 7px;
+  background: var(--blue);
+  color: var(--dark);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font: 500 13px;
+  text-decoration: none;
+  &:hover {
+  	color: var(--black);
+  }
   ```
 - **Login Submit:** `padding:12px 24px; border-radius:8px; background:var(--white); color:var(--dark); font:400 16px` + spinner `14px` border `1px solid var(--dark)` with `border-bottom-color:transparent` rotating.
 - **Icon Buttons:** `background:transparent; border:none` (header hamburger, avatar edit `opacity:0→1` on hover, calendar arrows `50px` circle `bg:var(--white-o)`).
@@ -136,32 +195,110 @@ Opacity scale observed in CSS (for recreating tints): `...0A` (4%), `...14` (8%)
 
 - **Login Field (underline style, login only):**
   ```css
-  input{all:unset; box-sizing:border-box; width:100%; max-width:400px;
-    border-bottom:1px solid var(--gray); padding:12px 35px 12px 20px; color:var(--white)}
-  input::placeholder{color:var(--gray); font:400 16px}
-  .error{color:tomato; font-weight:100} .forgot{background:transparent;color:var(--gray);font:400 16px} .forgot:hover{text-decoration:underline}
+  input {
+  	all: unset;
+  	box-sizing: border-box;
+  	width: 100%;
+  	max-width: 400px;
+  	border-bottom: 1px solid var(--gray);
+  	padding: 12px 35px 12px 20px;
+  	color: var(--white);
+  }
+  input::placeholder {
+  	color: var(--gray);
+  	font: 400 16px;
+  }
+  .error {
+  	color: tomato;
+  	font-weight: 100;
+  }
+  .forgot {
+  	background: transparent;
+  	color: var(--gray);
+  	font: 400 16px;
+  }
+  .forgot:hover {
+  	text-decoration: underline;
+  }
   ```
 - **App Field (boxed style, settings/add-coins/support/chat):** computed on `settings input[type=password]`:
   ```css
-  background:rgb(55,55,55); /* var(--dark-gray) */ color:#fff;
-  border:1px solid rgba(255,255,255,.72); border-radius:8px; padding:12px 16px; outline:none;
+  background: rgb(55, 55, 55); /* var(--dark-gray) */
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 8px;
+  padding: 12px 16px;
+  outline: none;
   /* add-coins variant: background:var(--dark); color:var(--dark)? actually white-on-dark; padding:10px; border-radius:10px; text-align:right; border:none */
   ```
 - **Selects / Datepicker:** native `button,select,option{cursor:pointer}` + `react-datepicker` theme (selected `#216ba5`, hover `#1d5d90`, in-range `#f0f0f0`, highlight `#32be3f`). Keep native arrow, Montserrat 13–14px.
 - **Checkboxes:** `input[type=checkbox]{width:16px;height:16px;accent-color:var(--green);flex-shrink:0}` inside `label{font:13px white; gap:10px}` + contract box `bg:var(--dark); border:1px solid var(--gray); radius:8px; padding:12px; max-height:180px; overflow-y:auto`.
 - **Toggle Switch:** `40×22px pill`:
   ```css
-  .toggle{width:40px;height:22px;border-radius:11px;background:var(--dark-gray);border:none;transition:background .2s}
-  .toggle.on{background:var(--green)} .knob{width:16px;height:16px;border-radius:50%;background:var(--white);top:3px;left:3px;transition:transform .2s}
-  .on .knob{transform:translateX(18px)} .state{font:700 12px var(--gray)} .state.on{color:var(--green)}
-  .wrap{display:flex;gap:10px;padding:10px 14px;border:1px solid var(--gray);border-radius:10px;cursor:pointer}
+  .toggle {
+  	width: 40px;
+  	height: 22px;
+  	border-radius: 11px;
+  	background: var(--dark-gray);
+  	border: none;
+  	transition: background 0.2s;
+  }
+  .toggle.on {
+  	background: var(--green);
+  }
+  .knob {
+  	width: 16px;
+  	height: 16px;
+  	border-radius: 50%;
+  	background: var(--white);
+  	top: 3px;
+  	left: 3px;
+  	transition: transform 0.2s;
+  }
+  .on .knob {
+  	transform: translateX(18px);
+  }
+  .state {
+  	font: 700 12px var(--gray);
+  }
+  .state.on {
+  	color: var(--green);
+  }
+  .wrap {
+  	display: flex;
+  	gap: 10px;
+  	padding: 10px 14px;
+  	border: 1px solid var(--gray);
+  	border-radius: 10px;
+  	cursor: pointer;
+  }
   ```
 - **File Dropzone (homework submit):**
   ```css
-  border:2px dashed rgba(217,217,217,.2); border-radius:10px; padding:18px 20px;
-  color:var(--gray); font:13px; text-align:center;
-  &:hover{border-color:#acfa0066; background:#acfa0008; color:var(--white)}
-  &.filled{border-color:#acfa0066; background:#acfa000a} .clear{background:transparent;border:none;color:#f9012499;font:12px} .clear:hover{color:var(--red)}
+  border: 2px dashed rgba(217, 217, 217, 0.2);
+  border-radius: 10px;
+  padding: 18px 20px;
+  color: var(--gray);
+  font: 13px;
+  text-align: center;
+  &:hover {
+  	border-color: #acfa0066;
+  	background: #acfa0008;
+  	color: var(--white);
+  }
+  &.filled {
+  	border-color: #acfa0066;
+  	background: #acfa000a;
+  }
+  .clear {
+  	background: transparent;
+  	border: none;
+  	color: #f9012499;
+  	font: 12px;
+  }
+  .clear:hover {
+  	color: var(--red);
+  }
   ```
 - **Validation:** error text `tomato`, overdue `var(--red) 13px/500`, `not-required` orange `#fb923c`, instructor comment `13px white` with `10px/700 uppercase gray` label, submitted block `bg:#acfa000a; border:rgba(172,250,0,.15); radius:8px; padding:12px 14px`.
 
